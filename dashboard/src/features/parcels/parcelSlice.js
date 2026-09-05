@@ -9,9 +9,9 @@ export const fetchParcelsThunk = createAsyncThunk(
   "parcels/fetchAll",
   async (params, thunkAPI) => {
     try {
-      const { page = 1, limit = 10, search = "" } = params || {};
+      const { page = 1, limit = 10, search = "", member } = params || {};
       const { data } = await axiosInstance.get("/parcels", {
-        params: { page, limit, search: search || undefined },
+        params: { page, limit, search: search || undefined, member: member || undefined },
       });
       return data;
     } catch (error) {

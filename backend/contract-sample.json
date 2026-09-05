@@ -1,0 +1,163 @@
+{
+  "login": {
+    "message": "string",
+    "token": "string",
+    "user": {
+      "_id": "string",
+      "name": "string",
+      "email": "string",
+      "role": "string",
+      "createdAt": "string"
+    }
+  },
+  "health": {
+    "status": "string",
+    "service": "string",
+    "docs": "string"
+  },
+  "quoteNational": {
+    "type": "string",
+    "deliveryType": "string",
+    "parcelCategory": "string",
+    "shipmentType": "string",
+    "originCity": "string",
+    "destinationCity": "string",
+    "originCountry": "string",
+    "destinationCountry": "string",
+    "weight": "number",
+    "price": "number",
+    "currency": "string"
+  },
+  "quoteInternational": {
+    "type": "string",
+    "deliveryType": "string",
+    "parcelCategory": "string",
+    "shipmentType": "string",
+    "originCity": "string",
+    "destinationCity": "string",
+    "originCountry": "string",
+    "destinationCountry": "string",
+    "weight": "number",
+    "price": "number",
+    "currency": "string"
+  },
+  "parcelRow": {
+    "_id": "string",
+    "trackingId": "string",
+    "senderName": "string",
+    "senderPhone": "string",
+    "senderAddress": "string",
+    "receiverName": "string",
+    "receiverPhone": "string",
+    "receiverAddress": "string",
+    "originCity": "string",
+    "destinationCity": "string",
+    "shipmentType": "string",
+    "deliveryType": "string",
+    "parcelCategory": "string",
+    "weight": "number",
+    "originCountry": "string",
+    "destinationCountry": "string",
+    "storeName": "string",
+    "memberEmail": "string",
+    "price": "number",
+    "currency": "string",
+    "status": "string",
+    "createdAt": "string",
+    "updatedAt": "string",
+    "checkpoints": [
+      "array<[object Object]>"
+    ]
+  },
+  "parcelListMeta": {
+    "data": [
+      "array<[object Object]>"
+    ],
+    "page": "number",
+    "limit": "number",
+    "total": "number",
+    "totalPages": "number"
+  },
+  "tracked": {
+    "_id": "string",
+    "trackingId": "string",
+    "senderName": "string",
+    "senderPhone": "string",
+    "senderAddress": "string",
+    "receiverName": "string",
+    "receiverPhone": "string",
+    "receiverAddress": "string",
+    "originCity": "string",
+    "destinationCity": "string",
+    "shipmentType": "string",
+    "deliveryType": "string",
+    "parcelCategory": "string",
+    "weight": "number",
+    "originCountry": "string",
+    "destinationCountry": "string",
+    "storeName": "string",
+    "memberEmail": "string",
+    "price": "number",
+    "currency": "string",
+    "status": "string",
+    "createdAt": "string",
+    "updatedAt": "string",
+    "checkpoints": [
+      "array<[object Object]>"
+    ],
+    "trackingID": "string",
+    "shimpentType": "string",
+    "Weight": "number"
+  },
+  "stats": {
+    "totals": {
+      "parcels": "number",
+      "international": "number",
+      "revenue": "number",
+      "revenueUSD": "number"
+    },
+    "statusDistribution": [
+      "array<[object Object]>"
+    ],
+    "monthlyParcels": [
+      "array<[object Object]>"
+    ],
+    "monthlyRevenue": [
+      "array<[object Object]>"
+    ],
+    "weightDistribution": [
+      "array<[object Object]>"
+    ]
+  },
+  "memberRow": {
+    "_id": "string",
+    "name": "string",
+    "email": "string",
+    "phone": "string",
+    "plan": "string",
+    "memberCode": "string",
+    "homeCountry": "string",
+    "homeCity": "string",
+    "joinedAt": "string",
+    "hubAddresses": [
+      "array<[object Object]>"
+    ],
+    "totals": {
+      "parcels": "number",
+      "international": "number",
+      "delivered": "number",
+      "revenuePkr": "number",
+      "revenueUSD": "number"
+    },
+    "lastShipmentAt": "string"
+  },
+  "membersMeta": {
+    "data": [
+      "array<[object Object]>"
+    ],
+    "page": "number",
+    "limit": "number",
+    "total": "number",
+    "totalPages": "number"
+  }
+}

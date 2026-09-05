@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 
 const navItems = [
   { label: 'Home', path: '/' },
+  { label: 'Shop & Ship', path: '/shop-ship' },
   { label: 'Track Parcel', path: '/track' },
   { label: 'Calculate Cost', path: '/calculate' },
   { label: 'About', path: '/about' },
@@ -41,7 +42,7 @@ const Navbar = () => {
             <Package className="h-5 w-5 text-primary-foreground" />
           </div>
           <span className="font-display text-xl font-bold text-foreground">
-            Swift<span className="text-accent">Pak</span>
+            Swift<span className="text-accent">Ug</span>
           </span>
         </Link>
 

@@ -1,4 +1,4 @@
-import { deliveryTargetDays } from "./pricing.js";
+import { deliveryTargetDays, toUgx } from "./pricing.js";
 import { lastMonths, monthOf } from "./util.js";
 
 const STATUS_KEYS = ["arrived", "in_transit", "out_for_delivery", "delivered"];
@@ -30,13 +30,13 @@ export function monthlyParcelSeries(parcels) {
   return months.map((m) => ({ month: m.label, parcels: map[m.key] }));
 }
 
-/** [{month, revenue}] PKR revenue for the last 6 calendar months. */
+/** [{month, revenue}] UGX revenue for the last 6 calendar months (USD converted at FX). */
 export function monthlyRevenueSeries(parcels) {
   const months = lastMonths(6);
   const map = Object.fromEntries(months.map((m) => [m.key, 0]));
   for (const p of parcels) {
     const m = monthOf(p.createdAt);
-    if (m.key in map) map[m.key] += Number(p.price) || 0;
+    if (m.key in map) map[m.key] += toUgx(p.price, p.currency);
   }
   return months.map((m) => ({ month: m.label, revenue: map[m.key] }));
 }

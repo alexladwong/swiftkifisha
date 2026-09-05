@@ -6,6 +6,7 @@ import {
   topDestinationCities,
   deliveryPerformance,
 } from "../lib/aggregate.js";
+import { toUgx } from "../lib/pricing.js";
 import { ah, requireAuth } from "../middleware/auth.js";
 
 const router = Router();
@@ -19,7 +20,9 @@ router.get("/summary", requireAuth, ah(async (req, res) => {
   return res.json({
     totals: {
       parcels: rows.length,
-      revenue: rows.reduce((sum, p) => sum + (Number(p.price) || 0), 0),
+      international: rows.filter((p) => p.shipmentType === "international").length,
+      revenue: rows.reduce((sum, p) => sum + toUgx(p.price, p.currency), 0),
+      revenueUSD: Math.round(rows.reduce((sum, p) => sum + (p.currency === "USD" ? Number(p.price) : 0), 0) * 100) / 100,
     },
     citiesServed,
   });

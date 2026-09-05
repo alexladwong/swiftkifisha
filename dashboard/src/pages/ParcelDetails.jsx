@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { addCheckpointThunk } from "@/features/parcels/parcelSlice";
+import { formatMoney } from "@/lib/money";
 import { toast } from "sonner";
 
 const getParcelStatus = (parcel) => {
@@ -140,7 +141,7 @@ export default function ParcelDetails() {
                 <InfoRow label="Weight" value={`${parcel.weight} kg`} />
                 <InfoRow
                   label="Price"
-                  value={`PKR ${Number(parcel.price || 0).toLocaleString()} kg`}
+                  value={`${formatMoney(parcel.price, parcel.currency)}`}
                 />
                 <InfoRow
                   label="Created"
@@ -165,7 +166,7 @@ export default function ParcelDetails() {
                 <div className="space-y-1">
                   <Label>Location *</Label>
                   <Input
-                    placeholder="e.g. Karachi"
+                    placeholder="e.g. Kampala"
                     value={checkpoint.location}
                     onChange={(e) =>
                       setCheckpoint({ ...checkpoint, location: e.target.value })

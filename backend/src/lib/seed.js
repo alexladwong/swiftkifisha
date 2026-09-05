@@ -3,7 +3,7 @@ import { config } from "../config.js";
 import { db, objectId, generateTrackingId } from "./db.js";
 import { calculatePrice, deliveryTargetDays } from "./pricing.js";
 import {
-  PAKISTANI_CITIES,
+  UGANDA_CITIES,
   areaForCity,
   INTERNATIONAL_DESTINATION_OPTIONS,
 } from "./referenceData.js";
@@ -34,9 +34,9 @@ const CATEGORY_BAG = [
 const DELIVERY_BAG = ["standard", "standard", "standard", "overnight", "overnight", "sameDay"];
 const INTL_DELIVERY_BAG = ["standard", "standard", "standard", "standard", "overnight"];
 
-/** Member home locations: Pakistan plus an international diaspora. */
+/** Member home locations: Uganda plus an international diaspora. */
 const MEMBER_HOMES = [
-  { country: "Pakistan", cities: PAKISTANI_CITIES },
+  { country: "Uganda", cities: UGANDA_CITIES },
   { country: "United Arab Emirates", cities: ["Dubai", "Abu Dhabi", "Sharjah"] },
   { country: "Saudi Arabia", cities: ["Riyadh", "Jeddah", "Dammam"] },
   { country: "United Kingdom", cities: ["London", "Birmingham", "Manchester", "Leeds"] },
@@ -66,7 +66,7 @@ const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 const randomName = () => `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
-const randomPhone = () => `+92-${pick(MOBILE_PREFIXES)}-${rand(1000000, 9999999)}`;
+const randomPhone = () => `+256-7${rand(0, 9)}${rand(10000000, 99999999)}`;
 const randomEmail = (name) => `${name.toLowerCase().replace(/[^a-z ]/g, "").trim().replace(/\s+/g, ".")}.${rand(1, 999)}@example.com`;
 
 const randWeightForCategory = (category) => {
@@ -163,7 +163,7 @@ function deliveredAtFor({ createdAtMs, targetDays, isDelivered, now }) {
 function buildParcelBase({ createdAtMs, now, flow, steps, arrivedAt, deliveredAt, senderName, senderPhone, senderAddress, receiverName, receiverPhone, receiverAddress, shipmentType, originCity, destinationCity, originCountry, destinationCountry, deliveryType, parcelCategory, weight, storeName = null, memberId = null, memberEmail = null }) {
   const { price, currency } = calculatePrice({
     shipmentType, parcelCategory, weight, deliveryType,
-    originCountry: originCountry || "Pakistan", destinationCountry: destinationCountry || "Pakistan",
+    originCountry: originCountry || "Uganda", destinationCountry: destinationCountry || "Uganda",
   });
   const createdAt = new Date(createdAtMs);
   const parcel = {
@@ -173,8 +173,8 @@ function buildParcelBase({ createdAtMs, now, flow, steps, arrivedAt, deliveredAt
     receiverName, receiverPhone, receiverAddress,
     shipmentType,
     originCity, destinationCity,
-    originCountry: originCountry || "Pakistan",
-    destinationCountry: destinationCountry || "Pakistan",
+    originCountry: originCountry || "Uganda",
+    destinationCountry: destinationCountry || "Uganda",
     deliveryType, parcelCategory, weight,
     price, currency,
     storeName, memberId, memberEmail,
@@ -229,7 +229,7 @@ export async function buildDemoData() {
       plan: pick(MEMBER_PLANS),
       homeCountry: home.country,
       homeCity,
-      address: home.country === "Pakistan" ? addressForCity(homeCity) : addressForCityCountry(homeCity, home.country),
+      address: home.country === "Uganda" ? addressForCity(homeCity) : addressForCityCountry(homeCity, home.country),
       memberCode: code,
       joinedAt: new Date(Date.now() - rand(10, 400) * 86400000).toISOString(),
       hubAddresses: hubs.map((h) => ({
@@ -258,8 +258,8 @@ export async function buildDemoData() {
     let parcel;
     if (!member) {
       const shipmentType = "national";
-      const originCity = pick(PAKISTANI_CITIES);
-      const destinationCity = pick(PAKISTANI_CITIES.filter((c) => c !== originCity));
+      const originCity = pick(UGANDA_CITIES);
+      const destinationCity = pick(UGANDA_CITIES.filter((c) => c !== originCity));
       const senderName = randomName();
       const receiverName = randomName();
       const plan = planFlow(ageDays, createdAtMs, now);
@@ -274,7 +274,7 @@ export async function buildDemoData() {
         receiverPhone: randomPhone(),
         receiverAddress: addressForCity(destinationCity),
         shipmentType, originCity, destinationCity,
-        originCountry: "Pakistan", destinationCountry: "Pakistan",
+        originCountry: "Uganda", destinationCountry: "Uganda",
         deliveryType, parcelCategory, weight,
       });
     } else {

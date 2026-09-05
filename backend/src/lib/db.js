@@ -57,16 +57,16 @@ export function objectId() {
 
 const TRACKING_LETTERS = ["CRR", "SWP", "PAK", "SPD", "XPR", "FLT", "PKG", "AZM", "NAV", "QKS"];
 
-/** Human friendly unique tracking id, e.g. PK-CRR-482913. */
+/** Human friendly unique tracking id, e.g. UG-CRR-482913. */
 export function generateTrackingId(existing) {
   const used = new Set((existing || []).map((p) => p.trackingId));
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const letters = TRACKING_LETTERS[crypto.randomInt(TRACKING_LETTERS.length)];
     const digits = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
-    const id = `PK-${letters}-${digits}`;
+    const id = `UG-${letters}-${digits}`;
     if (!used.has(id)) return id;
   }
-  return `PK-${Date.now().toString().slice(-6)}-${crypto.randomInt(100000, 999999)}`;
+  return `UG-${Date.now().toString().slice(-6)}-${crypto.randomInt(100000, 999999)}`;
 }
 
 export function newIdFor(collection) {

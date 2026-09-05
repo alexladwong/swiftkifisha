@@ -75,7 +75,7 @@ export default function Analytics() {
             title="Total Revenue"
             value={totalRevenue}
             icon={DollarSign}
-            prefix={"PKR"}
+            prefix={"UGX"}
             index={0}
             iconClassName="bg-success/10 text-success"
           />
@@ -108,7 +108,7 @@ export default function Analytics() {
         <div className="grid gap-4 lg:grid-cols-2">
           <Card className="border-0 shadow-md">
             <CardHeader>
-              <CardTitle className="text-base">Revenue Trend (PKR)</CardTitle>
+              <CardTitle className="text-base">Revenue Trend (UGX)</CardTitle>
             </CardHeader>
 
             <CardContent>
@@ -150,7 +150,7 @@ export default function Analytics() {
                     />
 
                     <Tooltip
-                      formatter={(v) => `PKR ${v.toLocaleString()}`}
+                      formatter={(v) => `UGX ${v.toLocaleString()}`}
                       contentStyle={{
                         borderRadius: "8px",
                         border: "none",

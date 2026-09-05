@@ -1,10 +1,10 @@
 /**
  * International shop-and-ship reference data (SwiftPak Global).
  * Members hold virtual mailbox addresses in "hub" countries; we receive their
- * online orders there and ship worldwide. Domestic service within Pakistan
- * remains PKR; every international shipment is quoted in USD.
+ * online orders there and ship worldwide. Domestic service within Uganda
+ * is UGX; every international shipment is quoted in USD.
  */
-export const FX_PKR_PER_USD = 280;
+export const FX_UGX_PER_USD = 3700;
 
 export const HUB_COUNTRIES = [
   { country: "United States", code: "US", city: "New York", currency: "USD", pickupFee: 15 },
@@ -24,7 +24,7 @@ export const WORLD_COUNTRIES = [
   "Germany", "Greece", "Hong Kong", "India", "Indonesia", "Iran", "Iraq",
   "Ireland", "Italy", "Japan", "Jordan", "Kenya", "Kuwait", "Lebanon",
   "Malaysia", "Maldives", "Netherlands", "New Zealand", "Nigeria", "Norway",
-  "Oman", "Pakistan", "Philippines", "Poland", "Qatar", "Romania", "Russia",
+  "Oman", "Uganda", "Philippines", "Poland", "Qatar", "Romania", "Russia",
   "Saudi Arabia", "Singapore", "South Africa", "South Korea", "Spain",
   "Sri Lanka", "Sweden", "Switzerland", "Turkey", "United Arab Emirates",
   "United Kingdom", "United States",
@@ -41,7 +41,7 @@ export const WORLD_COUNTRIES_WITH_CAPITALS = [
   ["Kenya", "Nairobi"], ["Kuwait", "Kuwait City"], ["Lebanon", "Beirut"],
   ["Malaysia", "Kuala Lumpur"], ["Maldives", "Malé"], ["Netherlands", "Amsterdam"],
   ["New Zealand", "Wellington"], ["Nigeria", "Lagos"], ["Norway", "Oslo"],
-  ["Oman", "Muscat"], ["Pakistan", "Islamabad"], ["Philippines", "Manila"],
+  ["Oman", "Muscat"], ["Uganda", "Kampala"], ["Philippines", "Manila"],
   ["Poland", "Warsaw"], ["Qatar", "Doha"], ["Romania", "Bucharest"],
   ["Russia", "Moscow"], ["Saudi Arabia", "Riyadh"], ["Singapore", "Singapore"],
   ["South Africa", "Cape Town"], ["South Korea", "Seoul"], ["Spain", "Madrid"],
@@ -52,7 +52,7 @@ export const WORLD_COUNTRIES_WITH_CAPITALS = [
 
 /** Destination-zone -> USD per kg (pickup fee handled via origin hub table). */
 const ZONES = [
-  { name: "Zone 1", countries: ["Afghanistan", "India", "Iran", "Pakistan", "Bahrain", "Iraq", "Jordan", "Kuwait", "Lebanon", "Oman", "Qatar", "Saudi Arabia", "Turkey", "United Arab Emirates", "Egypt"], perKg: 7 },
+  { name: "Zone 1", countries: ["Afghanistan", "India", "Iran", "Uganda", "Bahrain", "Iraq", "Jordan", "Kuwait", "Lebanon", "Oman", "Qatar", "Saudi Arabia", "Turkey", "United Arab Emirates", "Egypt"], perKg: 7 },
   { name: "Zone 2", countries: ["Australia", "Bangladesh", "China", "Hong Kong", "Indonesia", "Japan", "Malaysia", "Maldives", "New Zealand", "Philippines", "Singapore", "South Korea", "Sri Lanka", "Thailand"], perKg: 8.5 },
   { name: "Zone 3", countries: ["Austria", "Belgium", "Denmark", "Finland", "France", "Germany", "Greece", "Ireland", "Italy", "Netherlands", "Norway", "Poland", "Romania", "Russia", "Spain", "Sweden", "Switzerland", "United Kingdom"], perKg: 9.5 },
   { name: "Zone 4", countries: ["Brazil", "Canada", "Kenya", "Nigeria", "South Africa", "United States"], perKg: 11 },

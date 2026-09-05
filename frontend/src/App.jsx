@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Index from "./pages/Index";
+import ShopShip from "./pages/ShopShip";
 import TrackParcel from "./pages/TrackParcel";
 import CalculateCost from "./pages/CalculateCost";
 import About from "./pages/About";
@@ -19,6 +20,7 @@ const App = () => (
       <Navbar />
       <Routes>
         <Route path="/" element={<Index />} />
+        <Route path="/shop-ship" element={<ShopShip />} />
         <Route path="/track" element={<TrackParcel />} />
         <Route path="/calculate" element={<CalculateCost />} />
         <Route path="/about" element={<About />} />

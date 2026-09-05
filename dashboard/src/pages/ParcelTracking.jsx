@@ -51,7 +51,7 @@ export default function ParcelTracking() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   className="pl-9"
-                  placeholder="Enter tracking ID (e.g. PK-CRR-123456)"
+                  placeholder="Enter tracking ID (e.g. UG-CRR-123456)"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}

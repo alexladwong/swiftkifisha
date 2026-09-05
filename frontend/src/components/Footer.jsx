@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Package, Mail, Phone, MapPin } from 'lucide-react';
+import { Package, Mail, Phone, MapPin, Globe2 } from 'lucide-react';
 
 const Footer = () => (
   <footer className="bg-foreground text-primary-foreground">
@@ -11,11 +11,15 @@ const Footer = () => (
               <Package className="h-5 w-5 text-accent-foreground" />
             </div>
             <span className="font-display text-xl font-bold">
-              Swift<span className="text-accent">Pak</span>
+              Swift<span className="text-accent">Ug</span>
             </span>
           </div>
           <p className="text-sm opacity-70 leading-relaxed">
-            Pakistan's trusted courier & parcel delivery service. Fast, reliable, and affordable shipping solutions nationwide.
+            SwiftUg is the global shop-and-ship courier. One membership gives you mailboxes
+            around the world and door-to-door delivery in 50+ countries.
+          </p>
+          <p className="text-sm opacity-70 leading-relaxed mt-2 flex items-center gap-1.5">
+            <Globe2 className="h-4 w-4 text-accent" /> Mailboxes in USA · UK · UAE · Germany · China · Singapore · Hong Kong
           </p>
         </div>
 
@@ -24,6 +28,7 @@ const Footer = () => (
           <ul className="space-y-2 text-sm opacity-70">
             {[
               { label: 'Home', path: '/' },
+              { label: 'Shop & Ship', path: '/shop-ship' },
               { label: 'Track Parcel', path: '/track' },
               { label: 'Calculate Cost', path: '/calculate' },
               { label: 'About Us', path: '/about' },
@@ -41,10 +46,11 @@ const Footer = () => (
         <div>
           <h4 className="font-display font-semibold mb-4">Services</h4>
           <ul className="space-y-2 text-sm opacity-70">
-            <li>Same Day Delivery</li>
-            <li>Overnight Delivery</li>
-            <li>Standard Delivery</li>
+            <li>Shop & Ship Worldwide</li>
+            <li>International Mailboxes</li>
+            <li>Parcel Consolidation</li>
             <li>International Shipping</li>
+            <li>Domestic Express (UG)</li>
           </ul>
         </div>
 
@@ -53,22 +59,22 @@ const Footer = () => (
           <ul className="space-y-3 text-sm opacity-70">
             <li className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-accent" />
-              123 Logistics Hub, Lahore, Pakistan
+              Swift Ug Global Operations, Dubai, UAE
             </li>
             <li className="flex items-center gap-2">
               <Phone className="h-4 w-4 text-accent" />
-              +92 300 1234567
+              +971 4 123 4567
             </li>
             <li className="flex items-center gap-2">
               <Mail className="h-4 w-4 text-accent" />
-              info@SwiftUG.pk
+              care@SwiftUg.com
             </li>
           </ul>
         </div>
       </div>
 
       <div className="mt-12 pt-8 border-t border-primary-foreground/10 text-center text-sm opacity-50">
-        © {new Date().getFullYear()} SwiftUG. All rights reserved.
+        © {new Date().getFullYear()} SwiftUg Global. All rights reserved.
       </div>
     </div>
   </footer>

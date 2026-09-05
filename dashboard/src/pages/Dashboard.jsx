@@ -233,7 +233,7 @@ export default function Dashboard() {
             <Card className="border-0 shadow-md">
               <CardHeader>
                 <CardTitle className="text-base">
-                  Revenue Per Month (PKR)
+                  Revenue Per Month (UGX)
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -260,7 +260,7 @@ export default function Dashboard() {
                       />
 
                       <Tooltip
-                        formatter={(v) => `PKR ${Number(v).toLocaleString()}`}
+                        formatter={(v) => `UGX ${Number(v).toLocaleString()}`}
                         contentStyle={{
                           borderRadius: "8px",
                           border: "none",

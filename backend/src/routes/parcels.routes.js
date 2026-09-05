@@ -3,8 +3,9 @@ import { db, objectId, generateTrackingId } from "../lib/db.js";
 import { calculatePrice } from "../lib/pricing.js";
 import {
   PARCEL_CATEGORIES, DELIVERY_TYPES, SHIPMENT_TYPES, PARCEL_STATUSES,
-  PAKISTANI_CITIES, INTERNATIONAL_DESTINATION_OPTIONS,
+  UGANDA_CITIES, UGANDA_REGION_NAMES,
 } from "../lib/referenceData.js";
+import { HUB_COUNTRIES, WORLD_COUNTRIES_WITH_CAPITALS } from "../lib/intl.js";
 import { formatDateTime, clamp, escapeRegExp } from "../lib/util.js";
 import { ah, requireAuth } from "../middleware/auth.js";
 
@@ -13,10 +14,28 @@ const router = Router();
 /* ------------------------------- helpers ------------------------------- */
 
 const isObjectId = (id) => /^[0-9a-f]{24}$/i.test(id || "");
+const s = (v) => (typeof v === "string" ? v.trim() : "");
 
+const WORLD_OPTIONS = WORLD_COUNTRIES_WITH_CAPITALS.map((o) => o.value);
+const HUB_COUNTRY_NAMES = HUB_COUNTRIES.map((h) => h.country);
+const UG = "Uganda";
+
+function parseCountryCity(destinationCity) {
+  // Accept "Country, Capital" options or a bare country name.
+  const direct = WORLD_COUNTRIES_WITH_CAPITALS.find((o) => o.country === destinationCity || o.value === destinationCity);
+  if (direct) return { country: direct.country, city: direct.value };
+  return null;
+}
+
+/**
+ * Validates a parcel or a quote.
+ *  - national: both cities must be Ugandan cities (domestic service)
+ *  - international: origin is a SwiftPak hub country or Uganda; destination is
+ *    any worldwide country (given via destinationCountry and/or
+ *    "Country, Capital" destinationCity).
+ */
 function validateParcelInput(body, { full = false } = {}) {
   const errors = [];
-  const s = (v) => (typeof v === "string" ? v.trim() : "");
   const need = (field, label) => {
     if (!s(body[field])) errors.push(`${label} is required.`);
   };
@@ -28,7 +47,6 @@ function validateParcelInput(body, { full = false } = {}) {
     need("receiverPhone", "Receiver phone");
     need("receiverAddress", "Receiver address");
   }
-  need("originCity", "Origin city");
   need("destinationCity", "Destination city");
 
   const shipmentType = s(body.shipmentType);
@@ -43,18 +61,32 @@ function validateParcelInput(body, { full = false } = {}) {
     errors.push("Weight must be a positive number (kg).");
   }
 
-  if (shipmentType === "national" && !PAKISTANI_CITIES.includes(s(body.originCity))) {
-    errors.push(`${body.originCity} is not a valid Pakistani origin city.`);
-  }
-  if (shipmentType === "national" && s(body.originCity) === s(body.destinationCity)) {
-    errors.push("Origin and destination cities cannot be the same.");
-  }
-  const destOk =
-    shipmentType === "international"
-      ? INTERNATIONAL_DESTINATION_OPTIONS.some((o) => o.value === s(body.destinationCity))
-      : PAKISTANI_CITIES.includes(s(body.destinationCity));
-  if (shipmentType && !destOk) {
-    errors.push("Destination city is not valid for the selected shipment type.");
+  let originCountry = s(body.originCountry) || UG;
+  let destinationCountry = s(body.destinationCountry) || "";
+  const originCity = s(body.originCity);
+  const destinationCity = s(body.destinationCity);
+
+  if (shipmentType === "national") {
+    if (!UGANDA_CITIES.includes(originCity) && !UGANDA_REGION_NAMES.includes(originCity)) errors.push("Origin must be a valid Ugandan city or region.");
+    if (!UGANDA_CITIES.includes(destinationCity) && !UGANDA_REGION_NAMES.includes(destinationCity)) errors.push("Destination must be a valid Ugandan city or region.");
+    if (originCity && originCity === destinationCity) errors.push("Origin and destination cities cannot be the same.");
+    originCountry = UG;
+    destinationCountry = UG;
+  } else {
+    if (originCountry !== UG && !HUB_COUNTRY_NAMES.includes(originCountry)) {
+      errors.push(`Origin country must be Uganda or one of our shop-and-ship hubs (${HUB_COUNTRY_NAMES.join(", ")}).`);
+    }
+    if (destinationCountry) {
+      const known = WORLD_COUNTRIES_WITH_CAPITALS.find((o) => o.country === destinationCountry);
+      if (!known) errors.push("Destination country is not served.");
+    } else {
+      const parsed = parseCountryCity(destinationCity);
+      if (parsed) {
+        destinationCountry = parsed.country;
+      } else {
+        errors.push("Destination city must include a served country (e.g. \"United Kingdom, London\").");
+      }
+    }
   }
 
   return { errors, values: {
@@ -64,8 +96,14 @@ function validateParcelInput(body, { full = false } = {}) {
     receiverName: full ? s(body.receiverName) : s(body.receiverName),
     receiverPhone: full ? s(body.receiverPhone) : s(body.receiverPhone),
     receiverAddress: full ? s(body.receiverAddress) : s(body.receiverAddress),
-    originCity: s(body.originCity), destinationCity: s(body.destinationCity),
+    originCity: originCity || (shipmentType === "international" && HUB_COUNTRY_NAMES.includes(originCountry)
+      ? `${HUB_COUNTRIES.find((h) => h.country === originCountry)?.city}, ${originCountry}` : ""),
+    destinationCity: destinationCity || destinationCountry,
     shipmentType, deliveryType, parcelCategory, weight: Number(weight),
+    originCountry,
+    destinationCountry,
+    storeName: s(body.storeName),
+    memberEmail: s(body.memberEmail),
   } };
 }
 
@@ -79,7 +117,9 @@ function checkpointRecord({ status, location, message, at = new Date() }) {
 
 /**
  * POST /api/parcels/calculate-cost  (public)
- * Quote: { originCity, destinationCity, shipmentType, parcelCategory, weight, deliveryType }
+ * Domestic:   { shipmentType:"national", originCity, destinationCity, parcelCategory, weight, deliveryType }
+ * Shop&Ship:  { shipmentType:"international", originCountry:"United States", destinationCountry:"Uganda",
+ *               destinationCity?:"Kampala", parcelCategory, weight, deliveryType }
  */
 router.post("/calculate-cost", ah(async (req, res) => {
   const { errors, values } = validateParcelInput(req.body || {}, { full: false });
@@ -92,6 +132,8 @@ router.post("/calculate-cost", ah(async (req, res) => {
     shipmentType: values.shipmentType,
     originCity: values.originCity,
     destinationCity: values.destinationCity,
+    originCountry: values.originCountry,
+    destinationCountry: values.destinationCountry,
     weight: values.weight,
     price,
     currency,
@@ -110,20 +152,33 @@ router.get("/track/:trackingId", ah(async (req, res) => {
   return res.json({ ...parcel, trackingID: parcel.trackingId, shimpentType: parcel.shipmentType, Weight: parcel.weight });
 }));
 
-/** GET /api/parcels?page=&limit=&search=  (admin) */
+/**
+ * GET /api/parcels?page=&limit=&search=&member=&originCountry=&destinationCountry=  (admin)
+ */
 router.get("/", requireAuth, ah(async (req, res) => {
   const page = clamp(parseInt(req.query.page, 10) || 1, 1, 100000);
   const limit = clamp(parseInt(req.query.limit, 10) || 10, 1, 100);
   const search = String(req.query.search || "").trim();
+  const member = String(req.query.member || "").trim();
+  const originCountry = String(req.query.originCountry || "").trim();
+  const destinationCountry = String(req.query.destinationCountry || "").trim();
 
   let rows = db.data.parcels;
+  if (member) {
+    const re = new RegExp(escapeRegExp(member), "i");
+    rows = rows.filter((p) => (p.memberId && p.memberId === member) || re.test(p.memberEmail || ""));
+  }
   if (search) {
     const re = new RegExp(escapeRegExp(search), "i");
     rows = rows.filter(
       (p) => re.test(p.trackingId) || re.test(p.senderName) || re.test(p.receiverName)
-        || re.test(p.originCity) || re.test(p.destinationCity),
+        || re.test(p.originCity) || re.test(p.destinationCity)
+        || re.test(p.memberEmail || "") || re.test(p.storeName || ""),
     );
   }
+  if (originCountry) rows = rows.filter((p) => p.originCountry === originCountry);
+  if (destinationCountry) rows = rows.filter((p) => p.destinationCountry === destinationCountry);
+
   rows = [...rows].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const total = rows.length;
   const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -151,7 +206,7 @@ router.post("/", requireAuth, ah(async (req, res) => {
     checkpoints: [
       checkpointRecord({
         status: "arrived",
-        location: values.originCity,
+        location: values.originCity || values.originCountry,
         message: "Shipment booked. Parcel received at origin facility.",
         at: now,
       }),

@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import {
   getDestinationOptionsForShipmentType,
   isValidDestinationForShipmentType,
-  PAKISTANI_CITY_OPTIONS,
+  UGANDA_CITY_OPTIONS,
 } from "@/lib/locationData";
 
 const categories = [
@@ -140,7 +140,7 @@ export default function CreateParcel() {
               <div>
                 <Label>Sender Phone *</Label>
                 <Input
-                  placeholder="+92-300-1234567"
+                  placeholder="+256-700-123456"
                   value={form.senderPhone}
                   onChange={(e) => update("senderPhone", e.target.value)}
                 />
@@ -172,7 +172,7 @@ export default function CreateParcel() {
               <div>
                 <Label>Receiver Phone *</Label>
                 <Input
-                  placeholder="+92-300-1234567"
+                  placeholder="+256-700-123456"
                   value={form.receiverPhone}
                   onChange={(e) => update("receiverPhone", e.target.value)}
                 />
@@ -234,7 +234,7 @@ export default function CreateParcel() {
                     <SelectValue placeholder="Select origin city" />
                   </SelectTrigger>
                   <SelectContent>
-                    {PAKISTANI_CITY_OPTIONS.map((o) => (
+                    {UGANDA_CITY_OPTIONS.map((o) => (
                       <SelectItem value={o.value} key={o.value}>
                         {o.label}
                       </SelectItem>

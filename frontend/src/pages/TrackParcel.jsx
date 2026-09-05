@@ -79,7 +79,7 @@ const TrackParcel = () => {
             className="max-w-lg mx-auto flex gap-2 mb-12"
           >
             <Input
-              placeholder="Enter Tracking ID (e.g. PK-CRR-123456)"
+              placeholder="Enter Tracking ID (e.g. UG-CRR-123456)"
               value={trackingId}
               onChange={(e) => setTrackingId(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleTrack()}

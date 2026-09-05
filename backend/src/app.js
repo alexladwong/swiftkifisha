@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import express from "express";
 import cors from "cors";
 
@@ -5,8 +6,11 @@ import authRoutes from "./routes/auth.routes.js";
 import parcelRoutes from "./routes/parcels.routes.js";
 import statsRoutes from "./routes/stats.routes.js";
 import analyticsRoutes from "./routes/analytics.routes.js";
+import memberRoutes from "./routes/members.routes.js";
+import shopRoutes from "./routes/shop.routes.js";
 
 const app = express();
+const LANDING = fs.readFileSync(new URL("./landing.html", import.meta.url), "utf8");
 
 app.disable("x-powered-by");
 app.use(cors());
@@ -18,15 +22,31 @@ app.use((req, _res, next) => {
   next();
 });
 
-app.get("/api/health", (_req, res) => res.json({ status: "ok", service: "swiftship-api" }));
+const HEALTH = { status: "ok", service: "swiftship-api", docs: "backend/README.md" };
+app.get("/api/health", (_req, res) => res.json(HEALTH));
+app.get("/health", (_req, res) => res.json(HEALTH));
+
+// Tiny human landing page so visiting the API in a browser is not a bare 404.
+app.get("/", (_req, res) => res.type("html").send(LANDING));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/parcels", parcelRoutes);
 app.use("/api/dashboard", statsRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/members", memberRoutes);
+app.use("/api/shop", shopRoutes);
 
-// Unknown API routes.
-app.use("/api", (_req, res) => res.status(404).json({ message: "API route not found." }));
+// Unknown routes -> always JSON. (Express's built-in HTML error page sets
+// Content-Security-Policy: default-src 'none', which breaks Chrome DevTools
+// probes like /.well-known/appspecific/com.chrome.devtools.json - never send it.)
+app.use((req, res) => {
+  res.status(404).json({
+    message: "Route not found.",
+    hint: req.originalUrl.startsWith("/api")
+      ? "See backend/README.md for the API reference."
+      : "This is an API server - try /api/health.",
+  });
+});
 
 // Central error handler.
 app.use((err, _req, res, _next) => {

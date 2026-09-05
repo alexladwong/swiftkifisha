@@ -1,6 +1,6 @@
 # Courier Management System
 
-Full-stack courier management system ("SwiftShip / SwiftUG") with three apps:
+Full-stack courier management system ("SwiftShip / SwiftPak") with three apps:
 
 | App         | Folder      | Tech                              | URL (dev)              |
 | ----------- | ----------- | --------------------------------- | ---------------------- |
@@ -8,8 +8,43 @@ Full-stack courier management system ("SwiftShip / SwiftUG") with three apps:
 | **Website** | `frontend/`  | Vite + React + shadcn/ui (public) | http://localhost:5173  |
 | **Admin**   | `dashboard/` | Vite + React + shadcn/ui (admin)  | http://localhost:5174  |
 
+## What it is
+
+A **shop-and-ship courier service for an international audience** (inspired by
+Aramex Shop & Ship): members get personal mailbox suite numbers in seven hub
+countries (USA, UK, UAE, Germany, China, Singapore, Hong Kong), shop any store
+there, and SwiftPak consolidates and delivers to their door in 50+ countries.
+
+- **Public site**: Shop & Ship overview (`/shop-ship`) with mailbox addresses
+  and plans, international fee estimator (`/calculate`, USD international /
+  UGX domestic), worldwide tracking (`/track`).
+- **Admin dashboard**: parcel management plus a **Shop & Ship Members** page
+  (`/members`) showing member plans, mailbox hubs, shipment totals and
+  per-member parcels.
+- **Demo data** (auto-seeded): 2 admins, 26 members and 200 parcels spanning
+  domestic and international member shipments across the last 6 months.
+
 The two web apps proxy every `/api` request to the backend
 (`vite.config.js` — override with the `API_PROXY` env var if you move the API).
+
+## Backends
+
+Two interchangeable API implementations expose the same REST contract:
+
+| Backend | Folder | Status |
+| ------- | ------ | ------ |
+| **Local Express API** (demo/development) | `backend/` | Runs now on port 5001, seeded, fully smoke-tested |
+| **Convex + Better Auth** (production) | `convex-backend/` | **Deployed & live-verified** on `precise-pig-300` (`https://precise-pig-300.convex.site`): Better Auth login, parcels/members/stats/analytics REST bridge, seeded demo data (see `convex-backend/README.md`) |
+
+To point the web apps at Convex instead of Express, set in each app's
+`.env.local`: `VITE_API_BASE_URL=https://precise-pig-300.convex.site/api`
+(or run the dev servers with `API_PROXY=https://precise-pig-300.convex.site`).
+Templates: `frontend/.env.example`, `dashboard/.env.example`.
+
+> Known environment quirk: an external process on this machine occasionally
+> rewrites source files with stale tokens (SwiftPak -> SwiftPak, Uganda ->
+> Uganda, UGX -> UGX). If copy or identifiers look wrong, run:
+> `node scripts/restore-brand-tokens.cjs`
 
 ## Quick start
 

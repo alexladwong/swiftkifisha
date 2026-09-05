@@ -11,7 +11,7 @@ export function DashboardLayout() {
           <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-card px-4 shadow-sm">
             <div className="flex items-center gap-2">
               <SidebarTrigger />
-              <h2 className="text-sm font-medium text-muted-foreground hidden sm:block">SwiftUG Courier Management System</h2>
+              <h2 className="text-sm font-medium text-muted-foreground hidden sm:block">SwiftUg Global — Courier Management System</h2>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon" className="rounded-full bg-primary/10">

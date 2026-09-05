@@ -9,9 +9,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 
 const contactInfo = [
-  { icon: MapPin, label: 'Address', value: '123 Logistics Hub, Main Boulevard, Lahore, Pakistan' },
-  { icon: Phone, label: 'Phone', value: '+92 300 1234567' },
-  { icon: Mail, label: 'Email', value: 'info@SwiftUG.pk' },
+  { icon: MapPin, label: 'Address', value: 'SwiftUg Global Operations, Business Bay, Dubai, United Arab Emirates' },
+  { icon: Phone, label: 'Phone', value: '+971 4 123 4567' },
+  { icon: Mail, label: 'Email', value: 'care@swiftpak.com' },
 ];
 
 const Contact = () => {
@@ -63,7 +63,7 @@ const Contact = () => {
                   </div>
                   <div className="space-y-2">
                     <Label>Phone</Label>
-                    <Input placeholder="+92 XXX XXXXXXX" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                    <Input placeholder="+256 7XX XXXXXX" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
                   </div>
                   <div className="space-y-2">
                     <Label>Message *</Label>

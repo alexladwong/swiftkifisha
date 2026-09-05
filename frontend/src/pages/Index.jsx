@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Package, Truck, Clock, Globe, Zap, Shield, MapPin, DollarSign,
-  ArrowRight, Star, Search
+  ArrowRight, Star, Search, ShoppingBag, Boxes, Radio
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,29 +18,30 @@ const fadeUp = {
 };
 
 const services = [
-  { icon: Zap, title: 'Same Day Delivery', desc: 'Urgent deliveries within the same city, guaranteed same-day.' },
-  { icon: Clock, title: 'Overnight Delivery', desc: 'Send today, deliver tomorrow across Pakistan.' },
-  { icon: Truck, title: 'Standard Delivery', desc: 'Affordable and reliable 2-5 day shipping nationwide.' },
-  { icon: Globe, title: 'International Shipping', desc: 'Global reach with trusted international partners.' },
+  { icon: Globe, title: 'Shop & Ship', desc: 'Your personal mailbox in the US, UK, UAE & more — shop any store in the world.' },
+  { icon: Boxes, title: 'Consolidation', desc: 'Combine multiple purchases into one shipment and pay a single international fee.' },
+  { icon: Zap, title: 'Express Worldwide', desc: 'Door-to-door express delivery to 50+ countries and territories.' },
+  { icon: Radio, title: 'Global Tracking', desc: 'Track every step of the journey — from the store shelf to your doorstep.' },
 ];
 
 const steps = [
-  { num: '01', title: 'Create Shipment', desc: 'Book your parcel online or at any SwiftUG branch.' },
-  { num: '02', title: 'In Transit', desc: 'Your parcel travels securely through our hub network.' },
-  { num: '03', title: 'Delivered', desc: 'Safe delivery to the doorstep with confirmation.' },
+  { num: '01', title: 'Create your free account', desc: 'Sign up online in two minutes and pick your plan.' },
+  { num: '02', title: 'Get your global mailbox', desc: 'We assign you personal addresses with suite numbers abroad.' },
+  { num: '03', title: 'Shop & consolidate', desc: 'Buy from any store — we receive and combine your parcels.' },
+  { num: '04', title: 'We deliver to your door', desc: 'One shipment, full tracking, customs handled, anywhere you live.' },
 ];
 
 const features = [
-  { icon: MapPin, title: 'Real-time Tracking', desc: 'Track every step of your parcel journey.' },
-  { icon: Shield, title: 'Secure Delivery', desc: 'End-to-end protection for your packages.' },
-  { icon: Globe, title: 'Nationwide Network', desc: 'Covering 200+ cities across Pakistan.' },
-  { icon: DollarSign, title: 'Affordable Pricing', desc: 'Competitive rates without hidden fees.' },
+  { icon: MapPin, title: 'Real-time Tracking', desc: 'Live updates from store to doorstep.' },
+  { icon: Shield, title: 'Protected Shipments', desc: 'Coverage and careful handling on every box.' },
+  { icon: Globe, title: 'Worldwide Network', desc: 'Mailboxes in 7 hub countries, delivery to 50+.' },
+  { icon: DollarSign, title: 'Transparent Pricing', desc: 'See the full fee before you buy — no surprises.' },
 ];
 
 const testimonials = [
-  { name: 'Ahmed Khan', city: 'Lahore', text: 'SwiftUG delivered my package from Lahore to Karachi in just one day. Incredible speed!', rating: 5 },
-  { name: 'Fatima Noor', city: 'Islamabad', text: 'Very reliable and the tracking updates are always accurate. Highly recommended.', rating: 5 },
-  { name: 'Ali Raza', city: 'Karachi', text: 'Best rates in the market and their customer support is outstanding.', rating: 4 },
+  { name: 'Ahmed Khan', city: 'Dubai, UAE', text: 'Bought sneakers from a US store that never shipped here. My SwiftUg mailbox made it effortless — 6 days to my door.', rating: 5 },
+  { name: 'Sara Malik', city: 'Toronto, Canada', text: 'Consolidated three orders from the UK and Germany into one box. Saved more than half the shipping cost.', rating: 5 },
+  { name: 'Fatima Noor', city: 'Kampala, Uganda', text: 'The fee calculator is exact, tracking is live and customs clearance was handled without any hassle.', rating: 5 },
 ];
 
 const Index = () => {
@@ -63,14 +64,15 @@ const Index = () => {
               transition={{ duration: 0.6 }}
             >
               <span className="inline-block rounded-full bg-accent/10 px-4 py-1.5 text-sm font-medium text-accent mb-6">
-                🚀 World's Fastest Courier Service
+                🌍 Shop Anywhere. Deliver Everywhere.
               </span>
               <h1 className="font-display text-4xl md:text-5xl lg:text-6xl font-extrabold text-foreground leading-tight">
-                Fast & Reliable Parcel Delivery{' '}
-                <span className="text-primary">Across Pakistan</span>
+                Worldwide Shopping,{' '}
+                <span className="text-primary">Delivered to Your Door</span>
               </h1>
               <p className="mt-6 text-lg text-muted-foreground max-w-lg leading-relaxed">
-                From Karachi to Dubai, SwiftUG delivers your parcels safely and on time. Same-day, overnight, and standard delivery options available.
+                Shop any store from your SwiftUg mailbox in New York, London or Dubai — then we
+                consolidate, clear customs and deliver to your door, anywhere you live.
               </p>
               <div className="mt-8 flex flex-wrap gap-4">
                 <Link to="/track">
@@ -78,9 +80,9 @@ const Index = () => {
                     <Search className="mr-2 h-4 w-4" /> Track Parcel
                   </Button>
                 </Link>
-                <Link to="/calculate">
+                <Link to="/shop-ship">
                   <Button size="lg" variant="outline" className="font-semibold border-primary/20">
-                    <DollarSign className="mr-2 h-4 w-4" /> Calculate Cost
+                    <DollarSign className="mr-2 h-4 w-4" /> Shop & Ship
                   </Button>
                 </Link>
               </div>
@@ -116,12 +118,12 @@ const Index = () => {
                 {/* Origin pin */}
                 <div className="absolute bottom-6 left-4 flex flex-col items-center">
                   <MapPin className="h-8 w-8 text-primary" />
-                  <span className="text-xs font-medium text-primary mt-1">Lahore</span>
+                  <span className="text-xs font-medium text-primary mt-1">New York</span>
                 </div>
                 {/* Destination pin */}
                 <div className="absolute bottom-6 right-4 flex flex-col items-center">
                   <MapPin className="h-8 w-8 text-accent" />
-                  <span className="text-xs font-medium text-accent mt-1">Karachi</span>
+                  <span className="text-xs font-medium text-accent mt-1">Dubai</span>
                 </div>
                 {/* Moving parcel */}
                 <motion.div
@@ -149,7 +151,7 @@ const Index = () => {
         <div className="container mx-auto px-4 md:px-6">
           <motion.div {...fadeUp} className="text-center mb-14">
             <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground">Our Services</h2>
-            <p className="mt-3 text-muted-foreground max-w-md mx-auto">Tailored delivery solutions for every need</p>
+            <p className="mt-3 text-muted-foreground max-w-md mx-auto">International shopping and shipping, made simple</p>
           </motion.div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {services.map((s, i) => (
@@ -180,10 +182,10 @@ const Index = () => {
       <section className="py-20 gradient-hero">
         <div className="container mx-auto px-4 md:px-6">
           <motion.div {...fadeUp} className="text-center mb-14">
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground">How It Works</h2>
-            <p className="mt-3 text-muted-foreground">Three simple steps to ship your parcel</p>
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground">How Shop & Ship Works</h2>
+            <p className="mt-3 text-muted-foreground">Four steps from global store to your doorstep</p>
           </motion.div>
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {steps.map((step, i) => (
               <motion.div
                 key={step.num}
@@ -196,7 +198,7 @@ const Index = () => {
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground font-display text-xl font-bold mb-4">
                   {step.num}
                 </div>
-                {i < 2 && (
+                {i < 3 && (
                   <div className="hidden md:block absolute top-8 left-[60%] w-[80%] h-0.5 bg-primary/20">
                     <motion.div
                       className="h-full bg-accent"
@@ -243,7 +245,7 @@ const Index = () => {
       <section className="py-20 bg-background">
         <div className="container mx-auto px-4 md:px-6">
           <motion.div {...fadeUp} className="text-center mb-14">
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground">Why Choose SwiftUG?</h2>
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground">Why Shop & Ship with SwiftUg?</h2>
           </motion.div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((f, i) => (
@@ -305,9 +307,9 @@ const Index = () => {
       <section className="py-20 bg-background">
         <div className="container mx-auto px-4 md:px-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
-            <AnimatedCounter end={500000} suffix="+" label="Parcels Delivered" />
-            <AnimatedCounter end={200} suffix="+" label="Cities Covered" />
-            <AnimatedCounter end={50000} suffix="+" label="Happy Customers" />
+            <AnimatedCounter end={2000000} suffix="+" label="Parcels Delivered" />
+            <AnimatedCounter end={52} suffix="+" label="Countries Served" />
+            <AnimatedCounter end={50000} suffix="+" label="Global Members" />
             <AnimatedCounter end={99} suffix="%" label="On-time Delivery" />
           </div>
         </div>

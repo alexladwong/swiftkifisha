@@ -1,16 +1,16 @@
-import { HUB_COUNTRIES, zoneForCountry, FX_PKR_PER_USD } from "./intl.js";
+import { HUB_COUNTRIES, zoneForCountry, FX_UGX_PER_USD } from "./intl.js";
 import { PARCEL_CATEGORIES } from "./referenceData.js";
 
 /**
- * Domestic (Pakistan) per-kg base rates in PKR by parcel category.
+ * Domestic (Uganda) per-kg base rates in UGX by parcel category.
  */
-const PKR_RATE_PER_KG = {
-  document: 250, small_package: 180, large_package: 150, books: 190,
-  clothing: 220, food: 240, cosmetics: 260, electronics: 320,
-  fragile: 380, medicine: 270,
+const UGX_RATE_PER_KG = {
+  document: 3500, small_package: 2500, large_package: 2000, books: 2600,
+  clothing: 3000, food: 3300, cosmetics: 3600, electronics: 4500,
+  fragile: 5200, medicine: 3800,
 };
-const PKR_HANDLING = 150;
-const PKR_DELIVERY_MULTIPLIER = { sameDay: 1.9, overnight: 1.35, standard: 1.0 };
+const UGX_HANDLING = 2000;
+const UGX_DELIVERY_MULTIPLIER = { sameDay: 1.9, overnight: 1.35, standard: 1.0 };
 
 /** Relative handling difficulty of a category (applies to intl per-kg). */
 const CATEGORY_FACTOR = {
@@ -27,19 +27,19 @@ const round2 = (n) => Math.round(n * 100) / 100;
 
 /**
  * Quote engine.
- * - Domestic ("national", origin+destination Pakistan): PKR (legacy table).
+ * - Domestic ("national", origin+destination Uganda): UGX (Ugandan shillings).
  * - International shop-and-ship: USD = hub pickup fee + zone per-kg, by weight,
  *   category and delivery speed.
- * @returns {{price:number, currency:"PKR"|"USD"}}
+ * @returns {{price:number, currency:"UGX"|"USD"}}
  */
-export function calculatePrice({ shipmentType = "national", parcelCategory = "small_package", weight = 1, deliveryType = "standard", originCountry = "Pakistan", destinationCountry = "Pakistan" }) {
+export function calculatePrice({ shipmentType = "national", parcelCategory = "small_package", weight = 1, deliveryType = "standard", originCountry = "Uganda", destinationCountry = "Uganda" }) {
   const category = PARCEL_CATEGORIES.includes(parcelCategory) ? parcelCategory : "small_package";
   const w = Number.isFinite(Number(weight)) && Number(weight) > 0 ? Number(weight) : 1;
 
   if (shipmentType !== "international") {
-    const subtotal = PKR_RATE_PER_KG[category] * w * (PKR_DELIVERY_MULTIPLIER[deliveryType] || 1) + PKR_HANDLING;
+    const subtotal = UGX_RATE_PER_KG[category] * w * (UGX_DELIVERY_MULTIPLIER[deliveryType] || 1) + UGX_HANDLING;
     const discounted = w >= BULK_WEIGHT_KG ? subtotal * BULK_DISCOUNT : subtotal;
-    return { price: Math.max(50, Math.round(discounted / 10) * 10), currency: "PKR" };
+    return { price: Math.max(2000, Math.round(discounted / 100) * 100), currency: "UGX" };
   }
 
   const hub = HUB_COUNTRIES.find((h) => h.country === originCountry);
@@ -51,9 +51,9 @@ export function calculatePrice({ shipmentType = "national", parcelCategory = "sm
   return { price: Math.max(INTL_MIN_TOTAL, round2(discounted)), currency: "USD" };
 }
 
-/** To keep dashboard/analytics charts single-currency, convert USD -> PKR. */
-export function toPkr(amount, currency) {
-  return currency === "USD" ? Math.round(Number(amount) * FX_PKR_PER_USD) : Number(amount);
+/** To keep dashboard/analytics charts single-currency, convert USD -> UGX. */
+export function toUgx(amount, currency) {
+  return currency === "USD" ? Math.round(Number(amount) * FX_UGX_PER_USD) : Number(amount);
 }
 
 /** Delivery target (days) used for on-time analytics. */

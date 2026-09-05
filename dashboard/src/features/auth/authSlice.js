@@ -5,11 +5,14 @@ import { axiosInstance } from "@/services/axiosInstance";
 const getErrorMessage = (error) =>
   error?.response?.data?.message || error?.message || "Something went wrong";
 
+const LOGIN_PATH = import.meta.env.VITE_AUTH_LOGIN_PATH || "/auth/login";
+const ADD_USER_PATH = import.meta.env.VITE_AUTH_ADD_USER_PATH || "/auth/add-user";
+
 export const loginThunk = createAsyncThunk(
   "auth/login",
   async (payload, thunkAPI) => {
     try {
-      const { data } = await axiosInstance.post("/auth/login", payload);
+      const { data } = await axiosInstance.post(LOGIN_PATH, payload);
       localStorage.setItem("token", data.token);
       toast.success("Logged In");
       return data;
@@ -25,7 +28,7 @@ export const addUserThunk = createAsyncThunk(
   "auth/addUser",
   async (payload, thunkAPI) => {
     try {
-      const { data } = await axiosInstance.post("/auth/add-user", payload);
+      const { data } = await axiosInstance.post(ADD_USER_PATH, payload);
       toast.success("User Created");
       return data;
     } catch (error) {

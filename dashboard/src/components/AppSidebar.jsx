@@ -6,6 +6,7 @@ import {
   LogOut,
   BarChart3,
   UserPlus,
+  Users,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
@@ -27,6 +28,7 @@ const mainItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Create Parcel", url: "/create-parcel", icon: PackagePlus },
   { title: "Manage Parcels", url: "/manage-parcels", icon: Boxes },
+  { title: "Shop & Ship Members", url: "/members", icon: Users },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Parcel Tracking", url: "/tracking", icon: Search },
   { title: "Add Admin", url: "/add-admin", icon: UserPlus },
@@ -48,11 +50,11 @@ export function AppSidebar() {
           className={`flex items-center gap-2 px-4 py-5 ${collapsed ? "justify-center" : ""}`}
         >
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-ring text-sidebar-primary font-bold text-sm">
-            PK
+            SU
           </div>
           {!collapsed && (
             <span className="text-lg font-bold text-sidebar-foreground tracking-tight">
-              SwiftUG
+             SwiftPak Global
             </span>
           )}
         </div>

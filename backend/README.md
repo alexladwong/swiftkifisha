@@ -45,7 +45,30 @@ from `POST /api/auth/login`.
 | GET    | /api/analytics/parcels               | 🔒   | [{ month, parcels }] last 6 months |
 | GET    | /api/analytics/top-cities            | 🔒   | [{ city, parcels }] top 5 destinations |
 | GET    | /api/analytics/delivery-performance  | 🔒   | [{ month, onTime, delayed }] % per month |
+| GET    | /api/shop/hubs                       | –    | Mailbox hub countries (public) |
+| GET    | /api/shop/world                      | –    | Served countries + member plans (public) |
+| GET    | /api/members?page=&limit=&search=    | 🔒   | Shop & Ship members with shipment totals |
+| GET    | /api/members/:id                     | 🔒   | Member profile + hub addresses + recent parcels |
 | GET    | /api/health                          | –    | Liveness check |
+
+## International (Shop & Ship) model
+
+SwiftPak Uganda mirrors the shop-and-ship model: members hold personal mailbox
+suite numbers in seven hub countries (US, UK, UAE, Germany, China, Singapore,
+Hong Kong). Seeded demo data: 2 admins, 26 members (12 home countries, 53
+mailboxes) and 200 parcels (~1 in 4 are international member orders with store
+names such as Amazon/Shein/noon and customs checkpoints).
+
+Pricing is transparent and currency-aware:
+- Domestic shipments within Uganda: **UGX** (Ugandan shilling per-kg table; 15 domestic cities incl. Kampala).
+- International shop-and-ship: **USD** = hub pickup fee + destination-zone
+  per-kg rate × weight × category × delivery speed (min. $18).
+- Dashboard/analytics revenue is reported in UGX (USD converted at the fixed
+  seed rate 3700 in `src/lib/intl.js`); `revenueUSD` totals are also exposed.
+
+Parcels now carry `originCountry`, `destinationCountry`, `currency`, and for
+member shipments `storeName`, `memberId`, `memberEmail`. List filtering:
+`?member=<id|email>`, `?originCountry=`, `?destinationCountry=`.
 
 Checkpoint events include `status`, `location`, `message`, `timestamp`,
 `timestamps` and `dateTime` so both timeline components (dashboard and
@@ -62,7 +85,7 @@ src/
   lib/
     db.js              JSON file store + id generators
     referenceData.js   cities/categories/status definitions
-    pricing.js         quote engine (national & international, PKR)
+    pricing.js         quote engine (domestic UGX & international USD)
     seed.js            demo dataset (2 admins, 160 parcels over 6 months)
     aggregate.js       dashboard/analytics computations
     util.js            small helpers
