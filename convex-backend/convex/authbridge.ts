@@ -316,7 +316,10 @@ export const socialSession = mutation({
     let session: any = null;
     try {
       session = await auth.api.getSession({
-        headers: { cookie: "better-auth.session_token=" + token },
+        headers: {
+          authorization: "Bearer " + token,
+          cookie: "better-auth.session_token=" + token,
+        },
       });
     } catch (err: any) {
       throw new HttpError(401, "Your session is invalid or expired. Please sign in again.");

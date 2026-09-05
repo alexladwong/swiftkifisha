@@ -146,6 +146,32 @@ http.route({
   }),
 });
 
+// Admin passwordless sign-in (email + OTP) — same contract as the Express API.
+http.route({
+  path: "/api/auth/admin/otp/request", method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    try {
+      const body = await readJson(req);
+      const result = await ctx.runMutation(api.otp.adminOtpRequest, { email: String(body.email ?? "") });
+      return json(200, result);
+    } catch (e) { return err(e); }
+  }),
+});
+
+http.route({
+  path: "/api/auth/admin/otp/verify", method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    try {
+      const body = await readJson(req);
+      const result = await ctx.runMutation(api.otp.adminOtpVerify, {
+        email: String(body.email ?? ""),
+        code: String(body.code ?? ""),
+      });
+      return json(200, result);
+    } catch (e) { return err(e); }
+  }),
+});
+
 http.route({
   path: "/api/auth/reset-password", method: "POST",
   handler: httpAction(async (ctx, req) => {
@@ -178,9 +204,11 @@ http.route({
       if (!/^https?:\/\//.test(callbackURL)) {
         return json(400, { message: "A valid callback URL is required." });
       }
-      const origin = new URL(callbackURL).origin;
       const state = await signGoogleState(process.env.BETTER_AUTH_SECRET ?? "dev", callbackURL);
-      const redirectUri = origin + "/api/auth/callback/google";
+      // redirect_uri must be the API origin that serves /api/auth/* (this
+      // request's origin), so Google returns the code here — not to the app.
+      const apiOrigin = new URL(req.url).origin;
+      const redirectUri = apiOrigin + "/api/auth/callback/google";
       const location = googleAuthURL(g.clientId, redirectUri, state);
       return new Response(null, { status: 302, headers: { Location: location, ...CORS_HEADERS } });
     } catch (e) { return err(e); }
@@ -209,8 +237,8 @@ http.route({
       if (!callbackURL) return redirect("/", "Invalid sign-in state. Please try again.");
 
       const g = googleCredentials();
-      const origin = new URL(callbackURL).origin;
-      const redirectUri = origin + "/api/auth/callback/google";
+      const apiOrigin = new URL(req.url).origin;
+      const redirectUri = apiOrigin + "/api/auth/callback/google";
 
       const profile = await exchangeGoogleCode({
         code,
@@ -268,8 +296,9 @@ http.route({
       if (!session) throw new Error("Could not create the session record.");
 
       const sameSite = process.env.CROSS_SITE_AUTH === "true" ? "None" : "Lax";
+      const secure = process.env.CROSS_SITE_AUTH === "true" ? "; Secure" : "";
       const cookie = "better-auth.session_token=" + token +
-        "; Path=/; HttpOnly; SameSite=" + sameSite +
+        "; Path=/; HttpOnly; SameSite=" + sameSite + secure +
         "; Max-Age=" + 30 * 24 * 60 * 60;
       const headers: Record<string, string> = {
         Location: callbackURL,

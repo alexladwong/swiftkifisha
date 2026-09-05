@@ -9,7 +9,7 @@
  *
  * Requires: local Express data file + authenticated Convex CLI.
  */
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,11 +19,13 @@ const dataFile = path.resolve(here, "../../backend/data/db.json");
 const data = JSON.parse(fs.readFileSync(dataFile, "utf8"));
 
 function run(fn, arg) {
-  const json = arg === undefined ? "" : " " + JSON.stringify(arg);
-  const out = execSync(`npx convex run ${fn}${json}`, {
+  const args = ["convex", "run", fn];
+  if (arg !== undefined) args.push(JSON.stringify(arg));
+  const out = execFileSync("npx", args, {
     cwd: path.resolve(here, ".."),
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
+    env: { ...process.env, CONVEX_DEPLOYMENT: process.env.CONVEX_DEPLOYMENT || "prod:precise-pig-300" },
   });
   return out;
 }
@@ -50,6 +52,12 @@ const mapMember = (row) => ({
 
 const mapParcel = (row, idByEmail) => {
   const memberId = row.memberEmail ? (idByEmail[String(row.memberEmail).toLowerCase()] ?? null) : (row.memberId ?? null);
+  const checkpoints = (row.checkpoints || []).map((c) => ({
+    status: c.status, location: c.location, message: c.message,
+    timestamp: c.timestamp ?? c.timestamps ?? "", timestamps: c.timestamps ?? c.timestamp ?? "",
+    dateTime: c.dateTime ?? "",
+  }));
+  const lastStatus = checkpoints.length ? checkpoints[checkpoints.length - 1].status : "arrived";
   return {
     trackingId: row.trackingId, senderName: row.senderName, senderPhone: row.senderPhone,
     senderAddress: row.senderAddress, receiverName: row.receiverName, receiverPhone: row.receiverPhone,
@@ -57,13 +65,9 @@ const mapParcel = (row, idByEmail) => {
     destinationCity: row.destinationCity, originCountry: row.originCountry,
     destinationCountry: row.destinationCountry, deliveryType: row.deliveryType,
     parcelCategory: row.parcelCategory, weight: row.weight, price: row.price, currency: row.currency,
-    status: row.status, storeName: row.storeName ?? null, memberId, memberEmail: row.memberEmail ?? null,
-    createdAt: row.createdAt, updatedAt: row.updatedAt,
-    checkpoints: (row.checkpoints || []).map((c) => ({
-      status: c.status, location: c.location, message: c.message,
-      timestamp: c.timestamp ?? c.timestamps ?? "", timestamps: c.timestamps ?? c.timestamp ?? "",
-      dateTime: c.dateTime ?? "",
-    })),
+    status: row.status ?? lastStatus, storeName: row.storeName ?? null, memberId,
+    memberEmail: row.memberEmail ?? null,
+    createdAt: row.createdAt, updatedAt: row.updatedAt, checkpoints,
   };
 };
 

@@ -34,6 +34,16 @@ export default defineSchema({
     .index("by_token", ["token"])
     .index("by_email", ["email"]),
 
+  // Admin passwordless sign-in codes (email + hashed 6-digit OTP, 5 min TTL).
+  adminOtps: defineTable({
+    email: v.string(),
+    codeHash: v.string(),
+    expiresAt: v.string(),
+    createdAt: v.string(),
+    lastSentAt: v.string(),
+    attempts: v.number(),
+  }).index("by_email", ["email"]),
+
   parcels: defineTable({
     trackingId: v.string(),
     senderName: v.string(),

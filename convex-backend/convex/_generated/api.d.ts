@@ -21,6 +21,7 @@ import type * as lib_pricing from "../lib/pricing.js";
 import type * as lib_pricingFx from "../lib/pricingFx.js";
 import type * as lib_types from "../lib/types.js";
 import type * as members from "../members.js";
+import type * as otp from "../otp.js";
 import type * as parcels from "../parcels.js";
 import type * as seed from "../seed.js";
 import type * as shop from "../shop.js";
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   "lib/pricingFx": typeof lib_pricingFx;
   "lib/types": typeof lib_types;
   members: typeof members;
+  otp: typeof otp;
   parcels: typeof parcels;
   seed: typeof seed;
   shop: typeof shop;
