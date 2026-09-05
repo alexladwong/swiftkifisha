@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import { motion } from "framer-motion";
 import { Package, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { fetchSocialSession } from "@/lib/authApi";
+import { setSession } from "@/features/auth/authSlice";
 import { useI18n } from "@/i18n";
 
 /**
@@ -16,6 +18,7 @@ import { useI18n } from "@/i18n";
 export default function SocialCallbackPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [searchParams] = useSearchParams();
   const [error, setError] = useState(null);
   const errorParam = searchParams.get("error");
@@ -33,6 +36,7 @@ export default function SocialCallbackPage() {
         if (!data?.token || !data?.user) throw new Error("empty session");
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
+        dispatch(setSession({ token: data.token, user: data.user }));
         navigate("/account", { replace: true });
       } catch {
         if (active) setError(t("auth.socialErrorDesc"));

@@ -43,7 +43,12 @@ function jsonWithCredentials(req: Request, status: number, body: unknown) {
 
 function statusFromError(e: unknown): number {
   if (e instanceof HttpError) return e.status;
-  const message = (e as Error)?.message ?? "";
+  // Errors crossing ctx.runMutation boundaries arrive as plain Errors whose
+  // message is "Uncaught Error: [status] …" plus a stack — recover the code.
+  let message = (e as Error)?.message ?? "";
+  message = message.replace(/^Uncaught Error:\s*/, "");
+  const embedded = /^\[(\d{3})\]/.exec(message);
+  if (embedded) return Number(embedded[1]);
   if (/Authentication required/.test(message)) return 401;
   if (/Invalid email or password/.test(message)) return 401;
   if (/Admin access/.test(message)) return 403;
@@ -53,11 +58,13 @@ function statusFromError(e: unknown): number {
 }
 
 function messageFromError(e: unknown): string {
-  if (e instanceof HttpError) return e.message;
-  const raw = (e as Error)?.message ?? "Internal server error.";
+  let raw = e instanceof HttpError ? e.message : ((e as Error)?.message ?? "");
+  raw = raw.replace(/^Uncaught Error:\s*/, "");
+  const stackAt = raw.indexOf("\n    at ");
+  if (stackAt !== -1) raw = raw.slice(0, stackAt);
   const m = /^\[(\w+)\]:?\s*(.*)$/.exec(raw);
   if (m) return m[2] || "Internal server error.";
-  return raw || "Internal server error.";
+  return raw.trim() || "Internal server error.";
 }
 
 function err(e: unknown) {

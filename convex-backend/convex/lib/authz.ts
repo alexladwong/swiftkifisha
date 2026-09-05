@@ -5,7 +5,10 @@ type DbCtx = { db: any };
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
-    super(message);
+    // The status is embedded in the message because Convex serializes errors
+    // across ctx.runMutation boundaries (instanceof is lost); http.ts parses
+    // the "[status] " prefix and strips it from the response body.
+    super(`[${status}] ${message}`);
   }
 }
 

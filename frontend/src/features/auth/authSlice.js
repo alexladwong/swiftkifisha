@@ -52,6 +52,18 @@ const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
+    // Used after OAuth/session exchange completes on /auth/callback so the
+    // in-memory state matches localStorage without a full page reload.
+    setSession: (state, action) => {
+      const { token, user } = action.payload || {};
+      state.token = token || null;
+      state.user = user || null;
+      state.error = null;
+      if (token) localStorage.setItem("token", token);
+      else localStorage.removeItem("token");
+      if (user) localStorage.setItem("user", JSON.stringify(user));
+      else localStorage.removeItem("user");
+    },
     updateUser: (state, action) => {
       state.user = { ...(state.user || {}), ...action.payload };
       localStorage.setItem("user", JSON.stringify(state.user));
@@ -83,5 +95,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout, updateUser } = authSlice.actions;
+export const { logout, updateUser, setSession } = authSlice.actions;
 export default authSlice.reducer;
