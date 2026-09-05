@@ -1,0 +1,81 @@
+# SwiftShip API (backend)
+
+Express REST API powering both frontends in this repo. No external database is
+required: data lives in a JSON file (`data/db.json`, created automatically) and
+demo data is seeded on first start.
+
+## Run
+
+```sh
+npm install
+npm run dev        # node --watch, http://localhost:5001
+```
+
+Environment is configurable via `.env` (see `.env.example`): `PORT`
+(default 5001), `HOST`, `JWT_SECRET`, `DB_FILE`. Port 5000 is skipped by
+default because macOS "AirPlay Receiver" occupies it; the Vite dev proxies in
+`../frontend` and `../dashboard` forward `/api` here.
+
+## Demo accounts (auto-seeded on first start)
+
+| Email                | Password  | Role  |
+| -------------------- | --------- | ----- |
+| admin@swiftship.com  | Admin@123 | admin |
+| ops@swiftship.com    | Ops@123   | admin |
+
+Reset the demo database anytime: `npm run seed`
+
+## Endpoints
+
+Auth: all routes below marked 🔒 require `Authorization: Bearer <token>`
+from `POST /api/auth/login`.
+
+| Method | Path                                 | Auth | Description |
+| ------ | ------------------------------------ | ---- | ----------- |
+| POST   | /api/auth/login                      | –    | { email, password } → { token, user } |
+| POST   | /api/auth/add-user                   | 🔒   | Create admin { name, email, password } |
+| GET    | /api/parcels?page=&limit=&search=    | 🔒   | Paginated parcel list { data, page, limit, total, totalPages } |
+| POST   | /api/parcels                         | 🔒   | Create shipment; price computed server-side; returns parcel with trackingId |
+| POST   | /api/parcels/:id/checkpoint          | 🔒   | Append { location, title, description, status } tracking event |
+| GET    | /api/parcels/track/:trackingId       | –    | Public tracking lookup (404 if unknown) |
+| POST   | /api/parcels/calculate-cost          | –    | Quote → { type, parcelCategory, price, ... } |
+| GET    | /api/dashboard/stats                 | 🔒   | Totals, status/weight distributions, monthly parcels + revenue |
+| GET    | /api/analytics/summary               | 🔒   | Totals + citiesServed |
+| GET    | /api/analytics/revenue               | 🔒   | [{ month, revenue }] last 6 months |
+| GET    | /api/analytics/parcels               | 🔒   | [{ month, parcels }] last 6 months |
+| GET    | /api/analytics/top-cities            | 🔒   | [{ city, parcels }] top 5 destinations |
+| GET    | /api/analytics/delivery-performance  | 🔒   | [{ month, onTime, delayed }] % per month |
+| GET    | /api/health                          | –    | Liveness check |
+
+Checkpoint events include `status`, `location`, `message`, `timestamp`,
+`timestamps` and `dateTime` so both timeline components (dashboard and
+customer site) render them. Pricing categories/statuses/cities mirror the lists
+in `frontend/src/lib/locationData.js`.
+
+## Layout
+
+```
+src/
+  server.js            entry point (starts HTTP server)
+  app.js               express app + middleware + routing
+  config.js            env handling
+  lib/
+    db.js              JSON file store + id generators
+    referenceData.js   cities/categories/status definitions
+    pricing.js         quote engine (national & international, PKR)
+    seed.js            demo dataset (2 admins, 160 parcels over 6 months)
+    aggregate.js       dashboard/analytics computations
+    util.js            small helpers
+  middleware/auth.js   JWT guard
+  routes/              auth, parcels, dashboard stats, analytics
+scripts/
+  smoke.js             end-to-end route tests: node scripts/smoke.js
+  seed.js              regenerate demo data: npm run seed
+```
+
+## Test
+
+```sh
+npm run dev              # terminal 1
+node scripts/smoke.js    # terminal 2 — exercises every endpoint
+```

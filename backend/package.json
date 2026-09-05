@@ -1,0 +1,23 @@
+{
+  "name": "swiftship-backend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "REST API backend for the SwiftShip / SwiftUG courier management system (dashboard + customer frontend).",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "seed": "node scripts/seed.js",
+    "smoke:test": "node scripts/smoke.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
