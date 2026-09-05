@@ -1,4 +1,4 @@
-# SwiftUg
+# SwiftKifisha
 
 React + Vite app styled with Tailwind CSS and shadcn/ui.
 

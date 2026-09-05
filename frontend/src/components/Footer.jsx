@@ -12,7 +12,7 @@ const NAV_GROUPS = [
   {
     title: "Platform",
     links: [
-      { label: "Fikisha", to: "/shop-ship" },
+      { label: "Kifisha", to: "/shop-ship" },
       { label: "Mailbox addresses", to: "/shop-ship" },
       { label: "Estimate shipping fees", to: "/calculate" },
       { label: "Track a parcel", to: "/track" },
@@ -22,7 +22,7 @@ const NAV_GROUPS = [
   {
     title: "Resources",
     links: [
-      { label: "How Fikisha works", to: "/shop-ship" },
+      { label: "How Kifisha works", to: "/shop-ship" },
       { label: "Fee calculator", to: "/calculate" },
       { label: "Mailbox hub countries", to: "/shop-ship" },
       { label: "Contact support", to: "/contact" },
@@ -42,8 +42,8 @@ const NAV_GROUPS = [
     title: "Support",
     links: [
       { label: "Help centre", to: "/contact" },
-      { label: "Email support", to: "mailto:care@swiftug.com", external: true },
-      { label: "Report an issue", to: "mailto:care@swiftug.com", external: true },
+      { label: "Email support", to: "mailto:care@SwiftKifisha.com", external: true },
+      { label: "Report an issue", to: "mailto:care@SwiftKifisha.com", external: true },
       { label: "Track your parcel", to: "/track" },
     ],
   },
@@ -208,12 +208,12 @@ export default function Footer() {
           <div className="grid gap-12 pb-14 md:grid-cols-12 md:gap-10">
             {/* Brand */}
             <div className="md:col-span-5 lg:col-span-4">
-              <Link to="/" className="inline-flex items-center gap-2.5" aria-label="SwiftUg - home">
+              <Link to="/" className="inline-flex items-center gap-2.5" aria-label="SwiftKifisha - home">
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md">
                   <Package className="h-5 w-5" strokeWidth={2.2} />
                 </span>
                 <span className="font-display text-[22px] font-extrabold tracking-tight text-white">
-                  Swift<span className="text-accent">Pak</span>
+                  Swift<span className="text-accent">Kifisha</span>
                 </span>
               </Link>
 
@@ -235,8 +235,8 @@ export default function Footer() {
                 <p className="text-[12px] font-bold uppercase tracking-[0.14em] text-white/45">Contact</p>
                 <ul className="mt-3 space-y-2.5 text-[15px] text-white/70">
                   <li>
-                    <a href="mailto:care@swiftug.com" className="inline-flex items-center gap-2 transition-colors hover:text-white">
-                      <Mail className="h-4 w-4 text-accent" /> care@swiftug.com
+                    <a href="mailto:care@SwiftKifisha.com" className="inline-flex items-center gap-2 transition-colors hover:text-white">
+                      <Mail className="h-4 w-4 text-accent" /> care@SwiftKifisha.com
                     </a>
                   </li>
                   <li className="flex items-center gap-2">
@@ -272,13 +272,13 @@ export default function Footer() {
           {/* Bottom utility bar */}
           <div className="flex flex-col gap-5 border-t border-white/10 py-7 lg:flex-row lg:items-center lg:justify-between">
             <p className="text-[13px] text-white/45">
-              © {new Date().getFullYear()} SwiftUg Global. All rights reserved.
+              © {new Date().getFullYear()} SwiftKifisha Global. All rights reserved.
             </p>
 
             <nav aria-label="Footer utility" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px]">
               {[
                 { label: "Home", to: "/" },
-                { label: "Fikisha", to: "/shop-ship" },
+                { label: "Kifisha", to: "/shop-ship" },
                 { label: "Track", to: "/track" },
                 { label: "Estimate", to: "/calculate" },
                 { label: "About", to: "/about" },

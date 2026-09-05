@@ -58,7 +58,7 @@ export default function ProfileSection() {
   }
 
   return (
-    <div className="mx-auto max-w-[1080px] space-y-8">
+    <div className="mx-auto w-full max-w-[1180px] space-y-8">
       <header>
         <h1 className="font-display text-2xl font-extrabold tracking-tight text-foreground md:text-[28px]">My Profile</h1>
         <p className="mt-1 text-[15px] text-muted-foreground">Manage your personal information and account settings.</p>

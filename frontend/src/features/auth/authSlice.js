@@ -37,7 +37,7 @@ export const signupThunk = createAsyncThunk("auth/signup", async (payload, thunk
     const { data } = await axiosInstance.post(SIGNUP_PATH, payload);
     localStorage.setItem("token", data.token);
     localStorage.setItem("user", JSON.stringify(data.user || null));
-    toast.success("Account created - welcome to SwiftUg!");
+    toast.success("Account created - welcome to SwiftKifisha!");
     return data;
   } catch (error) {
     const message = getErrorMessage(error);

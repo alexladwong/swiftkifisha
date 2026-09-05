@@ -1,6 +1,6 @@
 # Courier Management System
 
-Full-stack courier management system ("SwiftShip / SwiftUg") with three apps:
+Full-stack courier management system ("SwiftShip / SwiftKifisha") with three apps:
 
 | App         | Folder      | Tech                              | URL (dev)              |
 | ----------- | ----------- | --------------------------------- | ---------------------- |
@@ -10,15 +10,15 @@ Full-stack courier management system ("SwiftShip / SwiftUg") with three apps:
 
 ## What it is
 
-A **Fikisha courier service for an international audience** (inspired by
+A **Kifisha courier service for an international audience** (inspired by
 Aramex): members get personal mailbox suite numbers in seven hub
 countries (USA, UK, UAE, Germany, China, Singapore, Hong Kong), shop any store
-there, and SwiftUg consolidates and delivers to their door in 50+ countries.
+there, and SwiftKifisha consolidates and delivers to their door in 50+ countries.
 
-- **Public site**: Fikisha overview (`/shop-ship`) with mailbox addresses
+- **Public site**: Kifisha overview (`/shop-ship`) with mailbox addresses
   and plans, international fee estimator (`/calculate`, USD international /
   UGX domestic), worldwide tracking (`/track`).
-- **Admin dashboard**: parcel management plus a **Fikisha Members** page
+- **Admin dashboard**: parcel management plus a **Kifisha Members** page
   (`/members`) showing member plans, mailbox hubs, shipment totals and
   per-member parcels.
 - **Demo data** (auto-seeded): 2 admins, 26 members and 200 parcels spanning
@@ -42,7 +42,7 @@ To point the web apps at Convex instead of Express, set in each app's
 Templates: `frontend/.env.example`, `dashboard/.env.example`.
 
 > Known environment quirk: an external process on this machine occasionally
-> rewrites source files with stale tokens (SwiftUg -> SwiftUg, Uganda ->
+> rewrites source files with stale tokens (SwiftKifisha -> SwiftKifisha, Uganda ->
 > Uganda, UGX -> UGX). If copy or identifiers look wrong, run:
 > `node scripts/restore-brand-tokens.cjs`
 

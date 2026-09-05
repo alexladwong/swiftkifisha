@@ -36,7 +36,7 @@ export default function AddressesSection() {
   const copyAll = async () => {
     if (!current) return;
     const lines = [
-      "SwiftUg Mailbox - " + current.country,
+      "SwiftKifisha Mailbox - " + current.country,
       ...(current.addressLines || []),
       "Suite: " + current.suite,
     ];
@@ -52,11 +52,11 @@ export default function AddressesSection() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-[1180px] space-y-6">
       <header>
         <h1 className="font-display text-2xl font-extrabold tracking-tight text-foreground md:text-[28px]">My Addresses</h1>
         <p className="mt-1 text-[15px] text-muted-foreground">
-          Your assigned SwiftUg mailbox addresses. Use these when you shop online.
+          Your assigned SwiftKifisha mailbox addresses. Use these when you shop online.
         </p>
       </header>
 
@@ -143,8 +143,8 @@ export default function AddressesSection() {
                   <div className="flex items-center justify-between gap-4 py-4">
                     <dt className="flex items-center gap-2 text-sm text-muted-foreground"><FileText className="h-4 w-4" /> Mailbox name</dt>
                     <dd className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-foreground">SwiftUg Mailroom — {current.country}</span>
-                      <CopyButton value={"SwiftUg Mailroom - " + current.country} label="Copy" />
+                      <span className="text-sm font-semibold text-foreground">SwiftKifisha Mailroom — {current.country}</span>
+                      <CopyButton value={"SwiftKifisha Mailroom - " + current.country} label="Copy" />
                     </dd>
                   </div>
                   {(current.addressLines || []).map((line, i) => (
@@ -168,7 +168,7 @@ export default function AddressesSection() {
                 </dl>
 
                 <div className="mt-5 rounded-xl bg-surface/70 px-4 py-3.5 text-[13px] leading-relaxed text-slate-500">
-                  SwiftUg mailboxes are service addresses assigned to your membership - they cannot be edited or
+                  SwiftKifisha mailboxes are service addresses assigned to your membership - they cannot be edited or
                   deleted from here.{" "}
                   <Link to="/contact" className="font-semibold text-primary hover:underline">Ask support</Link> to change or add hubs.
                 </div>

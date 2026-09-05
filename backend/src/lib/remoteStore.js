@@ -32,13 +32,13 @@ async function connectPool() {
 
 /**
  * Ensures the sync table exists:
- * swiftug_sync(collection text, id text, doc jsonb, updated_at timestamptz)
+ * SwiftKifisha_sync(collection text, id text, doc jsonb, updated_at timestamptz)
  */
 export async function ensureSchema(p = null) {
   const client = p || (await connectPool());
   if (!client) return false;
   await client.query(`
-    CREATE TABLE IF NOT EXISTS swiftug_sync (
+    CREATE TABLE IF NOT EXISTS SwiftKifisha_sync (
       collection text NOT NULL,
       id text NOT NULL,
       doc jsonb NOT NULL,
@@ -53,7 +53,7 @@ export async function ensureSchema(p = null) {
 export async function pull(p = null) {
   const client = p || (await connectPool());
   if (!client) return null;
-  const res = await client.query("SELECT collection, doc FROM swiftug_sync");
+  const res = await client.query("SELECT collection, doc FROM SwiftKifisha_sync");
   if (res.rows.length === 0) return null;
   const out = { users: [], members: [], parcels: [] };
   for (const row of res.rows) {
@@ -72,7 +72,7 @@ export async function push(data, p = null) {
   const tx = await client.connect();
   try {
     await tx.query("BEGIN");
-    await tx.query("DELETE FROM swiftug_sync");
+    await tx.query("DELETE FROM SwiftKifisha_sync");
     const params = [];
     const rows = [];
     for (const collection of ["users", "members", "parcels"]) {
@@ -83,7 +83,7 @@ export async function push(data, p = null) {
     }
     if (rows.length) {
       const sql =
-        "INSERT INTO swiftug_sync (collection, id, doc) VALUES " +
+        "INSERT INTO SwiftKifisha_sync (collection, id, doc) VALUES " +
         rows.join(", ") +
         " ON CONFLICT (collection, id) DO UPDATE SET doc = EXCLUDED.doc, updated_at = now()";
       await tx.query(sql, params);

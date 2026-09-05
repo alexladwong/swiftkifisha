@@ -29,9 +29,9 @@ const About = () => (
   <div className="min-h-screen pb-20 pt-8 md:pt-14">
     <div className="container mx-auto px-4 md:px-6">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-16">
-        <h1 className="font-display text-3xl md:text-5xl font-bold text-foreground">About SwiftUg</h1>
+        <h1 className="font-display text-3xl md:text-5xl font-bold text-foreground">About SwiftKifisha</h1>
         <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-          From a local courier to the Fikisha network that lets anyone buy from the
+          From a local courier to the Kifisha network that lets anyone buy from the
           world's best stores — no matter where they live.
         </p>
       </motion.div>
@@ -39,7 +39,7 @@ const About = () => (
       <motion.section {...fadeUp} className="max-w-3xl mx-auto mb-20">
         <h2 className="font-display text-2xl font-bold text-foreground mb-4">Our Story</h2>
         <p className="text-muted-foreground leading-relaxed mb-4">
-          SwiftUg started in 2010 with a handful of riders and one simple frustration: great
+          SwiftKifisha started in 2010 with a handful of riders and one simple frustration: great
           products were locked inside borders. Stores in New York, London or Dubai would not
           ship abroad — and when they did, it was slow, costly and opaque.
         </p>
@@ -99,7 +99,7 @@ const About = () => (
             </p>
             <Link to="/shop-ship">
               <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 font-semibold">
-                <Boxes className="mr-2 h-4 w-4" /> Explore Fikisha
+                <Boxes className="mr-2 h-4 w-4" /> Explore Kifisha
               </Button>
             </Link>
           </CardContent>

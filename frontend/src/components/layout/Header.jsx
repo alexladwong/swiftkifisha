@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { Menu, Package, ChevronDown, LogOut, MapPin, Search, Globe2, Mail, ArrowRight, UserRound } from "lucide-react";
+import { Menu, Package, ChevronDown, LogOut, MapPin, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -14,13 +14,14 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import SideDrawer from "@/components/layout/SideDrawer";
+import DrawerNav from "@/components/layout/DrawerNav";
 import AuthDialog from "@/components/AuthDialog";
 import { logout } from "@/features/auth/authSlice";
 import { SHOP_HUBS } from "@/lib/intlData";
 
 const PRIMARY_NAV = [
   { label: "Home", path: "/" },
-  { label: "Fikisha", path: "/shop-ship" },
+  { label: "Kifisha", path: "/shop-ship" },
   { label: "Track", path: "/track" },
   { label: "Estimate", path: "/calculate" },
 ];
@@ -90,12 +91,12 @@ export default function Header() {
     >
       <div className="shell-md flex h-[76px] items-center gap-3 lg:h-20">
         {/* Brand */}
-        <Link to="/" className="flex shrink-0 items-center gap-2.5" aria-label="SwiftUg — home">
+        <Link to="/" className="flex shrink-0 items-center gap-2.5" aria-label="SwiftKifisha — home">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
             <Package className="h-5 w-5" strokeWidth={2.2} />
           </span>
           <span className="font-display text-[22px] font-extrabold tracking-tight text-foreground">
-            Swift<span className="text-accent">Pak</span>
+            Swift<span className="text-accent">Kifisha</span>
           </span>
         </Link>
 
@@ -211,125 +212,8 @@ export default function Header() {
       </div>
 
       {/* Drawer */}
-      <SideDrawer open={menuOpen} onClose={() => setMenuOpen(false)} label="SwiftUg menu">
-        <div className="space-y-8">
-          {/* Main links */}
-          <nav aria-label="Menu">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Menu</p>
-            <ul className="space-y-1">
-              {[
-                { label: "Home", path: "/" },
-                { label: "Fikisha — mailboxes worldwide", path: "/shop-ship" },
-                { label: "Track a parcel", path: "/track" },
-                { label: "Estimate shipping fees", path: "/calculate" },
-              ].map((item) => (
-                <li key={item.path}>
-                  <Link
-                    to={item.path}
-                    className="group flex items-center justify-between rounded-xl px-3 py-3 text-[17px] font-semibold text-foreground transition-colors hover:bg-surface"
-                  >
-                    {item.label}
-                    <ArrowRight className="h-4 w-4 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-accent" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-
-          {/* Membership */}
-          <div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Membership</p>
-            {token && user ? (
-              <Link
-                to="/account"
-                className="flex items-center gap-3 rounded-xl border border-border bg-white p-3 transition-colors hover:border-primary/30 hover:bg-surface"
-              >
-                <Avatar className="h-10 w-10">
-                  <AvatarFallback className="bg-primary-soft text-primary text-sm">{initialsOf(user.name)}</AvatarFallback>
-                </Avatar>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-foreground">{user.name}</span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {user.plan ? user.plan + " member" : "Member"} · My mailboxes
-                  </span>
-                </span>
-              </Link>
-            ) : (
-              <div className="space-y-2">
-                <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90" onClick={() => openAuth("signup")}>
-                  Create free account <ArrowRight className="ml-1 h-4 w-4" />
-                </Button>
-                <Button variant="outline" className="w-full" onClick={() => openAuth("signin")}>
-                  Sign in to my account
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {/* Mailbox hubs */}
-          <div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Mailbox hubs</p>
-            <ul className="grid grid-cols-1 gap-1.5">
-              {SHOP_HUBS.map((h) => (
-                <li key={h.id}>
-                  <Link
-                    to="/shop-ship"
-                    className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-surface hover:text-foreground"
-                  >
-                    <span className="text-lg leading-none">{h.flag}</span>
-                    <span className="flex-1">{h.country}</span>
-                    <span className="text-xs text-slate-400">{h.city}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Company */}
-          <div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Company</p>
-            <ul className="space-y-1">
-              {[
-                { label: "About our story", path: "/about" },
-                { label: "Contact & support", path: "/contact" },
-              ].map((item) => (
-                <li key={item.path}>
-                  <Link to={item.path} className="block rounded-xl px-3 py-2.5 text-[15px] font-medium text-slate-700 transition-colors hover:bg-surface hover:text-foreground">
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
-              <li>
-                <a
-                  href="mailto:care@swiftug.com"
-                  className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-[15px] font-medium text-slate-700 transition-colors hover:bg-surface hover:text-foreground"
-                >
-                  <Mail className="h-4 w-4 text-slate-400" /> care@swiftug.com
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          {/* Region / language (informational, real coverage) */}
-          <div className="rounded-2xl border border-border bg-surface/60 p-4">
-            <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Globe2 className="h-4 w-4 text-primary" /> Serving you worldwide
-            </p>
-            <p className="text-[13px] leading-relaxed text-muted-foreground">
-              Mailboxes in 7 hub countries · delivery to 50+ countries · English-language support ·
-              fees in USD and UGX.
-            </p>
-          </div>
-
-          {!token && (
-            <p className="text-center text-xs text-slate-400">
-              Already have an account?{" "}
-              <button type="button" onClick={() => openAuth("signin")} className="font-semibold text-primary underline-offset-2 hover:underline">
-                Sign in
-              </button>
-            </p>
-          )}
-        </div>
+      <SideDrawer open={menuOpen} onClose={() => setMenuOpen(false)} label="SwiftKifisha menu">
+        <DrawerNav onNavigate={() => setMenuOpen(false)} onOpenAuth={openAuth} onSignOut={handleLogout} />
       </SideDrawer>
 
       <AuthDialog open={authOpen} onOpenChange={setAuthOpen} initialMode={authMode} />

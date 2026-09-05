@@ -1,6 +1,6 @@
-# SwiftUg Global — Convex backend (precise-pig-300)
+# SwiftKifisha Global — Convex backend (precise-pig-300)
 
-Convex re-implementation of the SwiftUg Fikisha API with Better Auth,
+Convex re-implementation of the SwiftKifisha Kifisha API with Better Auth,
 preserving the REST contract the two frontends call (dashboard + customer site).
 
 **Status: DEPLOYED and verified live.** Code is running on the production

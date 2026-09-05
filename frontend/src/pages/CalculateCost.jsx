@@ -142,7 +142,7 @@ const CalculateCostPage = () => {
             Estimate Your International Shipping Fee
           </h1>
           <p className="mt-2 text-muted-foreground max-w-xl mx-auto">
-            Shop from your SwiftUg mailbox abroad and see exactly what delivery to your door costs.
+            Shop from your SwiftKifisha mailbox abroad and see exactly what delivery to your door costs.
           </p>
         </motion.div>
 
@@ -235,7 +235,7 @@ const CalculateCostPage = () => {
                           {form.destinationCountry}. Fee includes hub pickup and international delivery.
                         </>
                       ) : (
-                        <>Pick your SwiftUg mailbox country, then the delivery country and its city / region.</>
+                        <>Pick your SwiftKifisha mailbox country, then the delivery country and its city / region.</>
                       )}
                     </p>
                   </>
@@ -392,7 +392,7 @@ const CalculateCostPage = () => {
                 <div className="text-center text-muted-foreground">
                   <Calculator className="h-16 w-16 mx-auto mb-4 opacity-20" />
                   <p className="max-w-xs mx-auto">
-                    Estimate the door-to-door cost of shipping from any SwiftUg mailbox hub to your country.
+                    Estimate the door-to-door cost of shipping from any SwiftKifisha mailbox hub to your country.
                   </p>
                 </div>
               </div>

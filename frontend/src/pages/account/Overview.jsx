@@ -28,19 +28,19 @@ export default function Overview() {
   const mailboxes = Array.isArray(user.hubAddresses) ? user.hubAddresses : [];
 
   return (
-    <div className="mx-auto max-w-[1080px] space-y-8">
+    <div className="mx-auto w-full max-w-[1180px] space-y-8">
       <header>
         <h1 className="font-display text-2xl font-extrabold tracking-tight text-foreground md:text-[28px]">
           Welcome back{user.name ? ", " + user.name.split(" ")[0] : ""}
         </h1>
         <p className="mt-1 text-[15px] text-muted-foreground">
-          Manage your account, mailboxes, shipments and security.
+          Manage your account, addresses and shipments from one place.
         </p>
       </header>
 
       {/* Summary strip */}
       <section aria-label="Account summary" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-border bg-white p-5">
+        <div className="rounded-xl border-[#e5eaf2] bg-white p-[22px]">
           <p className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-slate-400">
             <Wallet className="h-3.5 w-3.5" /> Plan
           </p>
@@ -49,7 +49,7 @@ export default function Overview() {
             {user.memberCode && <span className="font-mono text-[12px] text-slate-400">{user.memberCode}</span>}
           </div>
         </div>
-        <div className="rounded-xl border border-border bg-white p-5">
+        <div className="rounded-xl border-[#e5eaf2] bg-white p-[22px]">
           <p className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-slate-400">
             <MapPin className="h-3.5 w-3.5" /> Home
           </p>
@@ -57,7 +57,7 @@ export default function Overview() {
             {user.homeCity || "Kampala"}, {user.homeCountry || "Uganda"}
           </p>
         </div>
-        <div className="rounded-xl border border-border bg-white p-5">
+        <div className="rounded-xl border-[#e5eaf2] bg-white p-[22px]">
           <p className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-slate-400">
             <Globe2 className="h-3.5 w-3.5" /> Mailboxes
           </p>
@@ -66,7 +66,7 @@ export default function Overview() {
             View addresses
           </Link>
         </div>
-        <div className="rounded-xl border border-border bg-white p-5">
+        <div className="rounded-xl border-[#e5eaf2] bg-white p-[22px]">
           <p className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-slate-400">
             <Package className="h-3.5 w-3.5" /> Shipments
           </p>
@@ -80,15 +80,17 @@ export default function Overview() {
       {/* Quick actions */}
       <section aria-label="Quick actions">
         <h2 className="mb-3 font-display text-lg font-bold text-foreground">Quick actions</h2>
-        <div className="flex flex-wrap gap-2.5">
+<div className="flex flex-wrap items-center gap-2.5">
+          <Link to="/calculate" className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-accent px-5 text-sm font-bold text-white shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:bg-accent/90">
+            Estimate shipping <ArrowRight className="h-4 w-4" />
+          </Link>
           {[
-            { label: "Estimate shipping", to: "/calculate" },
             { label: "Track a parcel", to: "/track" },
             { label: "Explore hub countries", to: "/shop-ship" },
             { label: "Contact support", to: "/contact" },
           ].map((a) => (
-            <Link key={a.label} to={a.to} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-white px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:border-primary/30 hover:text-primary">
-              {a.label} <ArrowRight className="h-3.5 w-3.5" />
+            <Link key={a.label} to={a.to} className="inline-flex h-11 items-center gap-1.5 rounded-lg border border-[#e5eaf2] bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:border-primary/30 hover:text-primary">
+              {a.label}
             </Link>
           ))}
         </div>
@@ -114,13 +116,15 @@ export default function Overview() {
         )}
 
         {parcels && parcels.data.length === 0 && (
-          <div className="flex flex-col items-center rounded-xl border border-dashed border-border bg-white px-6 py-14 text-center">
-            <Package className="h-10 w-10 text-slate-200" />
-            <p className="mt-4 font-display text-base font-bold text-foreground">No shipments yet</p>
-            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-              Once you shop to your mailbox and we ship to you, your parcels will appear here.
+<div className="flex min-h-[260px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-white px-6 py-8 text-center">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-muted">
+              <Package className="h-5 w-5 text-slate-300" />
+            </span>
+            <p className="mt-3 font-display text-[15px] font-bold text-foreground">No shipments yet</p>
+            <p className="mt-1 max-w-sm text-[13px] leading-relaxed text-muted-foreground">
+              Your recent shipments will appear here once a parcel is sent from one of your mailboxes.
             </p>
-            <Link to="/shop-ship" className="mt-5 rounded-lg bg-accent px-5 py-2.5 text-sm font-bold text-white hover:bg-accent/90">
+            <Link to="/shop-ship" className="mt-4 rounded-lg bg-accent px-5 py-2.5 text-sm font-bold text-white hover:bg-accent/90">
               Start with your mailbox
             </Link>
           </div>

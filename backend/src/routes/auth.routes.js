@@ -1,4 +1,5 @@
 import { Router } from "express";
+import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { config } from "../config.js";
@@ -128,6 +129,57 @@ router.post("/signup", ah(async (req, res) => {
       memberCode, plan: member.plan, homeCountry: member.homeCountry, homeCity: member.homeCity, hubAddresses },
   });
 }));
+
+const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
+const RESET_TTL_MS = 60 * 60 * 1000;
+
+/** POST /api/auth/forgot-password { email } */
+router.post("/forgot-password", ah(async (req, res) => {
+  const email = String((req.body || {}).email || "").toLowerCase().trim();
+  const user = email ? db.data.users.find((u) => u.email === email) : null;
+  if (user) {
+    db.data.resetTokens = db.data.resetTokens.filter((rt) => rt.email !== email);
+    const token = crypto.randomBytes(32).toString("hex");
+    db.data.resetTokens.push({
+      _id: objectId(),
+      email,
+      tokenHash: sha256(token),
+      expiresAt: new Date(Date.now() + RESET_TTL_MS).toISOString(),
+    });
+    db.persist();
+    const link = `${config.frontendUrl}/reset-password?token=${token}`;
+    console.log(`[auth] password reset requested for ${email}`);
+    if (config.isDev) console.log(`[auth] DEV RESET LINK: ${link}`);
+    return res.json({
+      message: "If an account exists for that email, a reset link has been sent.",
+      ...(config.isDev ? { devResetLink: link } : {}),
+    });
+  }
+  return res.json({ message: "If an account exists for that email, a reset link has been sent." });
+}));
+
+/** POST /api/auth/reset-password { token, newPassword } */
+router.post("/reset-password", ah(async (req, res) => {
+  const { token, newPassword } = req.body || {};
+  if (!token || !newPassword || String(newPassword).length < 8) {
+    return res.status(400).json({ message: "A valid token and a password of at least 8 characters are required." });
+  }
+  const tokenHash = sha256(String(token));
+  const record = db.data.resetTokens.find((rt) => rt.tokenHash === tokenHash);
+  if (!record) return res.status(400).json({ message: "This reset link is invalid or has already been used." });
+  if (new Date(record.expiresAt).getTime() < Date.now()) {
+    db.data.resetTokens = db.data.resetTokens.filter((rt) => rt._id !== record._id);
+    db.persist();
+    return res.status(400).json({ message: "This reset link has expired. Please request a new one." });
+  }
+  const user = db.data.users.find((u) => u.email === record.email);
+  if (!user) return res.status(400).json({ message: "Account not found." });
+  user.passwordHash = await bcrypt.hash(String(newPassword), config.bcryptRounds ?? 10);
+  db.data.resetTokens = db.data.resetTokens.filter((rt) => rt._id !== record._id);
+  db.persist();
+  return res.json({ message: "Password updated successfully. You can now sign in." });
+}));
+
 
 /** POST /api/auth/change-password (signed-in user) */
 router.post("/change-password", requireAuth, ah(async (req, res) => {

@@ -19,7 +19,7 @@ export default function HeroSection() {
             className="mb-6 flex items-center gap-2 text-[14px] font-semibold text-slate-500"
           >
             <span className="h-2 w-2 rounded-full bg-accent" aria-hidden="true" />
-            International Fikisha
+            International Kifisha
           </motion.p>
 
           <motion.h1
@@ -39,7 +39,7 @@ export default function HeroSection() {
             transition={{ duration: 0.5, delay: 0.12, ease }}
             className="mt-6 max-w-[560px] text-pretty text-[17px] leading-[1.7] text-muted-foreground md:text-lg"
           >
-            SwiftUg gives you a personal mailbox in the USA, UK, UAE and more. Buy from
+            SwiftKifisha gives you a personal mailbox in the USA, UK, UAE and more. Buy from
             stores that would not ship to you - we receive, consolidate and deliver to your
             doorstep with transparent fees and live tracking.
           </motion.p>

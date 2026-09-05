@@ -9,7 +9,7 @@ async function syncFromRemote() {
   try {
     const remote = await pull();
     if (remote) {
-      db.data = remote;
+      db.data = { users: remote.users, members: remote.members, parcels: remote.parcels, resetTokens: [] };
       console.log("[remote] loaded " + remote.users.length + " users, " + remote.members.length + " members, " + remote.parcels.length + " parcels from Neon");
     } else if (!db.isEmpty()) {
       await ensureSchema();

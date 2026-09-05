@@ -70,7 +70,7 @@ export const all = mutation({
     // Admins: Better Auth users + admins table marking dashboard access.
     const auth = createAuth(ctx);
     const adminSeeds = [
-      { name: "SwiftUg Global Admin", email: "admin@swiftship.com", password: "Admin@123" },
+      { name: "SwiftKifisha Global Admin", email: "admin@swiftship.com", password: "Admin@123" },
       { name: "Operations Team", email: "ops@swiftship.com", password: "Ops@123" },
     ];
     for (const a of adminSeeds) {
@@ -108,12 +108,12 @@ export const all = mutation({
         hubAddresses: hubs.map((h) => ({
           country: h.country, city: h.city,
           suite: code + "-" + h.code,
-          addressLines: [h.city + " SwiftUg Mailroom", h.country],
+          addressLines: [h.city + " SwiftKifisha Mailroom", h.country],
         })),
       });
     }
 
-    // Parcels: ~1 in 4 are member Fikisha orders.
+    // Parcels: ~1 in 4 are member Kifisha orders.
     const allMembers: any[] = (await ctx.db.query("members").collect()) as any[];
     const now = Date.now();
     for (let i = 0; i < 64; i += 1) {
@@ -134,7 +134,7 @@ export const all = mutation({
         destinationCountry = member.homeCountry;
         destinationCity = member.homeCity;
         originCity = hub.city + ", " + hub.country;
-        const store = pick(STORES[hub.country] ?? ["SwiftUg Mailroom"]);
+        const store = pick(STORES[hub.country] ?? ["SwiftKifisha Mailroom"]);
         const { price, currency } = calculatePrice({ shipmentType: "international", parcelCategory: category, weight, deliveryType, originCountry, destinationCountry });
         fields = {
           senderName: store, senderPhone: "+1-800-555-0134", senderAddress: hub.city + ", " + hub.country,

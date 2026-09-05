@@ -17,13 +17,13 @@ export const authComponent = createClient<DataModel, typeof schema>(
   },
 );
 
-// Better Auth options for SwiftUg Global (email + password, sessions stored
+// Better Auth options for SwiftKifisha Global (email + password, sessions stored
 // in the component's tables, Convex native auth integration enabled).
 export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
   const siteUrl = process.env.SITE_URL ?? "http://localhost:5174";
   const convexSiteUrl = process.env.CONVEX_SITE_URL ?? "http://localhost:8080";
   return {
-    appName: "SwiftUg Global",
+    appName: "SwiftKifisha Global",
     baseURL: siteUrl,
     secret: process.env.BETTER_AUTH_SECRET ?? "dev-secret-change-me",
     database: authComponent.adapter(ctx),

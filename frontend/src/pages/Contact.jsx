@@ -9,9 +9,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 
 const contactInfo = [
-  { icon: MapPin, label: 'Address', value: 'SwiftUg Global Operations, Business Bay, Dubai, United Arab Emirates' },
+  { icon: MapPin, label: 'Address', value: 'SwiftKifisha Global Operations, Business Bay, Dubai, United Arab Emirates' },
   { icon: Phone, label: 'Phone', value: '+971 4 123 4567' },
-  { icon: Mail, label: 'Email', value: 'care@swiftug.com' },
+  { icon: Mail, label: 'Email', value: 'care@SwiftKifisha.com' },
 ];
 
 const Contact = () => {

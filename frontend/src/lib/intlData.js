@@ -1,5 +1,5 @@
 /**
- * SwiftUg Global — international Fikisha reference data.
+ * SwiftKifisha Global — international Kifisha reference data.
  * Mirrors backend/src/lib/intl.js so the public site can render hubs, served
  * countries and fee hints without a network round-trip.
  */
@@ -8,49 +8,49 @@ export const SHOP_HUBS = [
   {
     id: "US", country: "United States", city: "New York", flag: "🇺🇸", currency: "USD",
     pickupFee: 15,
-    sample: { name: "SwiftUg Mailroom", lines: ["101 Fifth Avenue, Suite SP-100", "New York, NY 10003, USA"] },
+    sample: { name: "SwiftKifisha Mailroom", lines: ["101 Fifth Avenue, Suite SP-100", "New York, NY 10003, USA"] },
     perks: ["Shop thousands of US online stores", "Free 30-day storage & consolidation", "Repackaging and photo inspection on request"],
     stores: ["Amazon.com", "eBay", "Walmart", "Nike.com", "Etsy", "Target", "Apple Store"],
   },
   {
     id: "GB", country: "United Kingdom", city: "London", flag: "🇬🇧", currency: "GBP",
     pickupFee: 15,
-    sample: { name: "SwiftUg Mailroom UK", lines: ["Unit 7 SwiftUg House, 48 Farringdon Road", "London EC1M 3DG, United Kingdom"] },
+    sample: { name: "SwiftKifisha Mailroom UK", lines: ["Unit 7 SwiftKifisha House, 48 Farringdon Road", "London EC1M 3DG, United Kingdom"] },
     perks: ["High-street and online favourites", "European redistribution hub", "VAT-exempt mailbox handling"],
     stores: ["Amazon.co.uk", "ASOS", "John Lewis", "Boots", "Argos"],
   },
   {
     id: "AE", country: "United Arab Emirates", city: "Dubai", flag: "🇦🇪", currency: "AED",
     pickupFee: 12,
-    sample: { name: "SwiftUg Kampala", lines: ["Office 204, Building 12, Business Bay", "Dubai, United Arab Emirates"] },
+    sample: { name: "SwiftKifisha Kampala", lines: ["Office 204, Building 12, Business Bay", "Dubai, United Arab Emirates"] },
     perks: ["Gateway to the Middle East", "noon, Amazon.ae and more", "Fast Gulf delivery lanes"],
     stores: ["noon.com", "Amazon.ae", "Namshi", "Carrefour UAE"],
   },
   {
     id: "DE", country: "Germany", city: "Frankfurt", flag: "🇩🇪", currency: "EUR",
     pickupFee: 16,
-    sample: { name: "SwiftUg Mailroom DE", lines: ["SwiftUg Logistics GmbH, Frachtweg 9", "60327 Frankfurt am Main, Germany"] },
+    sample: { name: "SwiftKifisha Mailroom DE", lines: ["SwiftKifisha Logistics GmbH, Frachtweg 9", "60327 Frankfurt am Main, Germany"] },
     perks: ["European e-commerce hub", "Zalando, Amazon.de, Otto", "Road & rail links across the EU"],
     stores: ["Amazon.de", "Zalando", "Otto", "MediaMarkt"],
   },
   {
     id: "CN", country: "China", city: "Shanghai", flag: "🇨🇳", currency: "CNY",
     pickupFee: 14,
-    sample: { name: "SwiftUg Mailroom CN", lines: ["Room 2101, Tower B, 88 Century Avenue, Pudong", "Shanghai 200120, China"] },
+    sample: { name: "SwiftKifisha Mailroom CN", lines: ["Room 2101, Tower B, 88 Century Avenue, Pudong", "Shanghai 200120, China"] },
     perks: ["Factory-direct deals", "AliExpress, Tmall, Shein and more", "E-commerce consolidation experts"],
     stores: ["AliExpress", "Shein", "Tmall", "JD.com", "Taobao"],
   },
   {
     id: "SG", country: "Singapore", city: "Singapore", flag: "🇸🇬", currency: "SGD",
     pickupFee: 13,
-    sample: { name: "SwiftUg Mailroom SG", lines: ["28 Tuas Avenue 6, #03-11 SwiftUg Hub", "Singapore 639318"] },
+    sample: { name: "SwiftKifisha Mailroom SG", lines: ["28 Tuas Avenue 6, #03-11 SwiftKifisha Hub", "Singapore 639318"] },
     perks: ["Clean, fast Southeast Asia hub", "Shopee, Lazada and more", "Regional redistribution"],
     stores: ["Shopee SG", "Lazada SG", "FairPrice"],
   },
   {
     id: "HK", country: "Hong Kong", city: "Hong Kong", flag: "🇭🇰", currency: "HKD",
     pickupFee: 13,
-    sample: { name: "SwiftUg Mailroom HK", lines: ["Unit 806, 8/F, Harbour View Centre, 120 Texaco Road", "Tsuen Wan, Hong Kong"] },
+    sample: { name: "SwiftKifisha Mailroom HK", lines: ["Unit 806, 8/F, Harbour View Centre, 120 Texaco Road", "Tsuen Wan, Hong Kong"] },
     perks: ["Duty-free shopping hub", "HKTVmall, Lazada HK and more", "Same-week Asia delivery"],
     stores: ["HKTVmall", "Lazada HK", "Fortress"],
   },

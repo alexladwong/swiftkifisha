@@ -20,7 +20,7 @@ const fadeUp = {
 const steps = [
   { icon: CreditCard, title: "1. Create your free account", desc: "Sign up in two minutes and choose your plan. No credit card needed to get started." },
   { icon: MapPin, title: "2. Get your international address", desc: "We assign you a personal mailbox with a suite number in the USA, UK, UAE and more." },
-  { icon: ShoppingBag, title: "3. Shop any store, anywhere", desc: "Use your SwiftUg address at checkout. We receive your packages at our hub." },
+  { icon: ShoppingBag, title: "3. Shop any store, anywhere", desc: "Use your SwiftKifisha address at checkout. We receive your packages at our hub." },
   { icon: PackageCheck, title: "4. We consolidate & ship to your door", desc: "Combine parcels, save on fees, and track every step until it reaches you — worldwide." },
 ];
 
@@ -39,7 +39,7 @@ const ShopShip = () => {
         {/* Hero */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center max-w-3xl mx-auto mb-16">
           <Badge variant="outline" className="mb-4 gap-1.5 px-3 py-1 text-accent border-accent/30">
-            <Sparkles className="h-3.5 w-3.5" /> SwiftUg Fikisha
+            <Sparkles className="h-3.5 w-3.5" /> SwiftKifisha Kifisha
           </Badge>
           <h1 className="font-display text-3xl md:text-5xl font-bold text-foreground leading-tight">
             One membership. <span className="text-accent">Addresses around the world.</span>
@@ -118,7 +118,7 @@ const ShopShip = () => {
         {/* How it works */}
         <div className="mb-20">
           <motion.div {...fadeUp} className="text-center mb-10">
-            <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground">How Fikisha works</h2>
+            <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground">How Kifisha works</h2>
             <p className="mt-2 text-muted-foreground">From a checkout page anywhere in the world to your doorstep.</p>
           </motion.div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">

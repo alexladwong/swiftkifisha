@@ -1,4 +1,4 @@
-// International Fikisha reference data (mirrors backend/src/lib/intl.js).
+// International Kifisha reference data (mirrors backend/src/lib/intl.js).
 export const FX_UGX_PER_USD = 3700;
 
 export const HUB_COUNTRIES = [
@@ -13,11 +13,11 @@ export const HUB_COUNTRIES = [
 
 export const HUB_MAILBOX_EXAMPLES: Record<string, string[]> = {
   "United States": ["101 Fifth Avenue, Suite SP-100", "New York, NY 10003, USA"],
-  "United Kingdom": ["Unit 7 SwiftUg House, 48 Farringdon Road", "London EC1M 3DG, United Kingdom"],
+  "United Kingdom": ["Unit 7 SwiftKifisha House, 48 Farringdon Road", "London EC1M 3DG, United Kingdom"],
   "United Arab Emirates": ["Office 204, Building 12, Business Bay", "Dubai, United Arab Emirates"],
-  Germany: ["SwiftUg Logistics GmbH, Frachtweg 9", "60327 Frankfurt am Main, Germany"],
+  Germany: ["SwiftKifisha Logistics GmbH, Frachtweg 9", "60327 Frankfurt am Main, Germany"],
   China: ["Room 2101, Tower B, 88 Century Avenue, Pudong", "Shanghai 200120, China"],
-  Singapore: ["28 Tuas Avenue 6, #03-11 SwiftUg Hub", "Singapore 639318"],
+  Singapore: ["28 Tuas Avenue 6, #03-11 SwiftKifisha Hub", "Singapore 639318"],
   "Hong Kong": ["Unit 806, 8/F, Harbour View Centre, 120 Texaco Road", "Tsuen Wan, Hong Kong"],
 };
 

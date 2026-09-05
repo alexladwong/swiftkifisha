@@ -15,7 +15,7 @@ export default function TrustStrip() {
     <section aria-label="Stores you can shop from" className="border-y border-border/70 bg-white">
       <div className="shell py-8">
         <p className="text-center text-[13px] font-medium text-slate-400">
-          Shop any store that ships to your SwiftUg mailbox — including
+          Shop any store that ships to your SwiftKifisha mailbox — including
         </p>
         <ul className="mt-5 flex flex-wrap items-center justify-center gap-x-9 gap-y-4">
           {STORES.map((s) => (

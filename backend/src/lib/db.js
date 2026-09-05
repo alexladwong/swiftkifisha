@@ -13,7 +13,7 @@ import { ensureEnabled, push } from "./remoteStore.js";
 class JsonDb {
   constructor(file) {
     this.file = file;
-    this.data = { users: [], members: [], parcels: [] };
+    this.data = { users: [], members: [], parcels: [], resetTokens: [] };
     this.load();
   }
 
@@ -25,10 +25,11 @@ class JsonDb {
         users: Array.isArray(parsed?.users) ? parsed.users : [],
         members: Array.isArray(parsed?.members) ? parsed.members : [],
         parcels: Array.isArray(parsed?.parcels) ? parsed.parcels : [],
+        resetTokens: Array.isArray(parsed?.resetTokens) ? parsed.resetTokens : [],
       };
     } catch (err) {
       console.error("[db] Corrupt database file, starting empty:", err.message);
-      this.data = { users: [], members: [], parcels: [] };
+      this.data = { users: [], members: [], parcels: [], resetTokens: [] };
     }
   }
 
@@ -61,7 +62,7 @@ export function objectId() {
   );
 }
 
-const TRACKING_LETTERS = ["CRR", "SWP", "PAK", "SPD", "XPR", "FLT", "PKG", "AZM", "NAV", "QKS"];
+const TRACKING_LETTERS = ["CRR", "SWP", "Kifisha", "SPD", "XPR", "FLT", "PKG", "AZM", "NAV", "QKS"];
 
 /** Human friendly unique tracking id, e.g. UG-CRR-482913. */
 export function generateTrackingId(existing) {

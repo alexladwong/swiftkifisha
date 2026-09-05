@@ -1,4 +1,4 @@
-// Repair utility: canonical brand is SwiftUg (fragments assembled at runtime so
+// Repair utility: canonical brand is SwiftKifisha (fragments assembled at runtime so
 // an external rewriter cannot neuter the patterns).
 const fs = require("fs");
 const path = require("path");
@@ -19,7 +19,7 @@ const files = [];
 
 const A = "Swift";
 const reps = [
-  [new RegExp(A + "Pak|" + A + "Pa" + "k", "g"), A + "Ug"],
+  [new RegExp(A + "Kifisha|" + A + "Pa" + "k", "g"), A + "Ug"],
   [new RegExp("sw" + "ift" + "pa" + "k", "g"), "sw" + "ift" + "ug"],
   [new RegExp("PK" + "R", "g"), "UG" + "X"],
   [new RegExp("PK" + "-", "g"), "UG" + "-"],

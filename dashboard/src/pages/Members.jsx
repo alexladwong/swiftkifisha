@@ -71,7 +71,7 @@ export default function Members() {
           <Users className="h-5 w-5 text-primary" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold">Fikisha Members</h1>
+          <h1 className="text-2xl font-bold">Kifisha Members</h1>
           <p className="text-sm text-muted-foreground">International members and their mailbox hubs</p>
         </div>
       </div>

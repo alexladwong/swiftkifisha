@@ -16,7 +16,7 @@ export function checkpointRecord(input: { status: string; location: string; mess
 }
 
 function newTrackingId(): string {
-  const letters = ["CRR","SWP","PAK","SPD","XPR","FLT","PKG","AZM","NAV","QKS"];
+  const letters = ["CRR","SWP","Kifisha","SPD","XPR","FLT","PKG","AZM","NAV","QKS"];
   const l = letters[Math.floor(Math.random() * letters.length)];
   const d = String(Math.floor(Math.random() * 1000000)).padStart(6, "0");
   return "UG-" + l + "-" + d;
@@ -47,7 +47,7 @@ export function quotePayload(args: Record<string, any>) {
   let destinationCountry = str(args.destinationCountry) || "Uganda";
   if (shipmentType === "international") {
     if (originCountry !== "Uganda" && !HUB_COUNTRIES.some((h) => h.country === originCountry)) {
-      throw new HttpError(400, "Origin country must be Uganda or one of our Fikisha hubs.");
+      throw new HttpError(400, "Origin country must be Uganda or one of our Kifisha hubs.");
     }
   } else {
     const o = str(args.originCity); const d = str(args.destinationCity);

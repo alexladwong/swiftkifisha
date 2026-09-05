@@ -2,7 +2,7 @@ import { Package, Radio, ShieldCheck, Wallet, ArrowRight } from "lucide-react";
 import { SHOP_HUBS } from "@/lib/intlData";
 
 /**
- * Product visual: the SwiftUg mailbox concept rendered as a clean interface
+ * Product visual: the SwiftKifisha mailbox concept rendered as a clean interface
  * card - no screenshots, no stock images, no invented numbers.
  */
 export default function HeroVisual() {
@@ -24,7 +24,7 @@ export default function HeroVisual() {
               <Package className="h-5 w-5" strokeWidth={2} />
             </span>
             <div>
-              <p className="font-display text-[15px] font-bold text-foreground">SwiftUg Mailbox</p>
+              <p className="font-display text-[15px] font-bold text-foreground">SwiftKifisha Mailbox</p>
               <p className="text-[13px] text-muted-foreground">New York, United States</p>
             </div>
           </div>

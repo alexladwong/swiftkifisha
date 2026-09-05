@@ -193,7 +193,7 @@ function buildParcelBase({ createdAtMs, now, flow, steps, arrivedAt, deliveredAt
 export async function buildDemoData() {
   const users = [];
   for (const admin of [
-    { name: "SwiftUg Global Admin", email: "admin@swiftship.com", password: "Admin@123" },
+    { name: "SwiftKifisha Global Admin", email: "admin@swiftship.com", password: "Admin@123" },
     { name: "Operations Team", email: "ops@swiftship.com", password: "Ops@123" },
   ]) {
     users.push({
@@ -241,7 +241,7 @@ export async function buildDemoData() {
     });
   }
 
-  // ---- Parcels: domestic shipments + international Fikisha arrivals ----
+  // ---- Parcels: domestic shipments + international Kifisha arrivals ----
   const parcels = [];
   const now = Date.now();
   const parcelCount = 200;

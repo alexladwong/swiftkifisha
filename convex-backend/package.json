@@ -1,9 +1,9 @@
 {
-  "name": "SwiftUg-convex",
+  "name": "SwiftKifisha-convex",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Convex backend (project precise-pig-300) for SwiftUg Global Fikisha, with Better Auth on Convex.",
+  "description": "Convex backend (project precise-pig-300) for SwiftKifisha Global Kifisha, with Better Auth on Convex.",
   "scripts": {
     "dev": "convex dev",
     "deploy": "convex deploy",

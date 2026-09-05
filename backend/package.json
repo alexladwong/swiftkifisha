@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "REST API backend for the SwiftShip / SwiftUg courier management system (dashboard + customer frontend).",
+  "description": "REST API backend for the SwiftShip / SwiftKifisha courier management system (dashboard + customer frontend).",
   "main": "src/server.js",
   "engines": {
     "node": ">=18.0.0"

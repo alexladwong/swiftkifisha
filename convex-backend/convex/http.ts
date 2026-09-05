@@ -70,7 +70,7 @@ http.route({
 });
 
 http.route({ path: "/", method: "GET", handler: httpAction(async () => json(200, {
-  message: "SwiftUg Global API on Convex (precise-pig-300).",
+  message: "SwiftKifisha Global API on Convex (precise-pig-300).",
   health: "/api/health", endpoints: "see convex-backend/README.md",
 })) });
 

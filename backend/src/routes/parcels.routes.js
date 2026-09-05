@@ -30,7 +30,7 @@ function parseCountryCity(destinationCity) {
 /**
  * Validates a parcel or a quote.
  *  - national: both cities must be Ugandan cities (domestic service)
- *  - international: origin is a SwiftUg hub country or Uganda; destination is
+ *  - international: origin is a SwiftKifisha hub country or Uganda; destination is
  *    any worldwide country (given via destinationCountry and/or
  *    "Country, Capital" destinationCity).
  */
@@ -74,7 +74,7 @@ function validateParcelInput(body, { full = false } = {}) {
     destinationCountry = UG;
   } else {
     if (originCountry !== UG && !HUB_COUNTRY_NAMES.includes(originCountry)) {
-      errors.push(`Origin country must be Uganda or one of our Fikisha hubs (${HUB_COUNTRY_NAMES.join(", ")}).`);
+      errors.push(`Origin country must be Uganda or one of our Kifisha hubs (${HUB_COUNTRY_NAMES.join(", ")}).`);
     }
     if (destinationCountry) {
       const known = WORLD_COUNTRIES_WITH_CAPITALS.find((o) => o.country === destinationCountry);
@@ -118,7 +118,7 @@ function checkpointRecord({ status, location, message, at = new Date() }) {
 /**
  * POST /api/parcels/calculate-cost  (public)
  * Domestic:   { shipmentType:"national", originCity, destinationCity, parcelCategory, weight, deliveryType }
- * Fikisha:  { shipmentType:"international", originCountry:"United States", destinationCountry:"Uganda",
+ * Kifisha:  { shipmentType:"international", originCountry:"United States", destinationCountry:"Uganda",
  *               destinationCity?:"Kampala", parcelCategory, weight, deliveryType }
  */
 router.post("/calculate-cost", ah(async (req, res) => {

@@ -100,7 +100,7 @@ export default function Index() {
       <section aria-labelledby="benefits-heading" className="bg-surface/60">
         <div className="shell-md py-20 md:py-28">
           <SectionHeading
-            eyebrow="Why SwiftUg"
+            eyebrow="Why SwiftKifisha"
             title="Quietly better cross-border shopping"
           />
           <div className="mt-14 grid gap-x-14 gap-y-12 md:grid-cols-3">
@@ -135,7 +135,7 @@ export default function Index() {
             ))}
           </div>
           <p className="mt-12 text-center text-[13px] font-medium text-slate-400">
-            Shoppers at <span className="text-slate-500">{STORES.join(" · ")}</span> can send their orders to a SwiftUg mailbox.
+            Shoppers at <span className="text-slate-500">{STORES.join(" · ")}</span> can send their orders to a SwiftKifisha mailbox.
           </p>
         </div>
       </section>

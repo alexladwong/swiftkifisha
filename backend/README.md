@@ -47,13 +47,13 @@ from `POST /api/auth/login`.
 | GET    | /api/analytics/delivery-performance  | 🔒   | [{ month, onTime, delayed }] % per month |
 | GET    | /api/shop/hubs                       | –    | Mailbox hub countries (public) |
 | GET    | /api/shop/world                      | –    | Served countries + member plans (public) |
-| GET    | /api/members?page=&limit=&search=    | 🔒   | Fikisha members with shipment totals |
+| GET    | /api/members?page=&limit=&search=    | 🔒   | Kifisha members with shipment totals |
 | GET    | /api/members/:id                     | 🔒   | Member profile + hub addresses + recent parcels |
 | GET    | /api/health                          | –    | Liveness check |
 
-## International (Fikisha) model
+## International (Kifisha) model
 
-SwiftUg Uganda mirrors the Fikisha model: members hold personal mailbox
+SwiftKifisha Uganda mirrors the Kifisha model: members hold personal mailbox
 suite numbers in seven hub countries (US, UK, UAE, Germany, China, Singapore,
 Hong Kong). Seeded demo data: 2 admins, 26 members (12 home countries, 53
 mailboxes) and 200 parcels (~1 in 4 are international member orders with store
@@ -61,7 +61,7 @@ names such as Amazon/Shein/noon and customs checkpoints).
 
 Pricing is transparent and currency-aware:
 - Domestic shipments within Uganda: **UGX** (Ugandan shilling per-kg table; 15 domestic cities incl. Kampala).
-- International Fikisha: **USD** = hub pickup fee + destination-zone
+- International Kifisha: **USD** = hub pickup fee + destination-zone
   per-kg rate × weight × category × delivery speed (min. $18).
 - Dashboard/analytics revenue is reported in UGX (USD converted at the fixed
   seed rate 3700 in `src/lib/intl.js`); `revenueUSD` totals are also exposed.
@@ -102,3 +102,27 @@ scripts/
 npm run dev              # terminal 1
 node scripts/smoke.js    # terminal 2 — exercises every endpoint
 ```
+## Neon Postgres auto-sync (optional)
+
+When `DATABASE_URL` is set (see `.env` / `.env.example`), the API uses your
+Neon Postgres database (`neondb`, production branch) as a persistent mirror:
+
+- **On boot**: connects to Neon, creates the `SwiftKifisha_sync` table
+  (`collection`, `id`, `doc jsonb`, `updated_at`), and loads the dataset
+  from Postgres when rows exist — so the API fully recovers even if the local
+  JSON cache (`data/db.json`) is deleted.
+- **On every write**: the local file is updated first, then the full dataset is
+  pushed to Neon in one batched transaction (replace-style upsert per row).
+- First boot with a populated local cache seeds Neon automatically.
+
+Connectivity/rows can be inspected with:
+
+```sh
+cd backend
+node --input-type=module -e "import { ping } from './src/lib/remoteStore.js'; const p = await ping(); const r = await p.query('SELECT collection, count(*) AS n FROM SwiftKifisha_sync GROUP BY collection'); console.log(r.rows); await p.end();"
+```
+
+Remove `DATABASE_URL` from `.env` to run purely on the local JSON file.
+
+> Note: the Convex production backend (`convex-backend/`) keeps its own
+> managed database; Neon sync applies to the Express API (`backend/`).
