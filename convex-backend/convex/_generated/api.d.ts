@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as adminTools from "../adminTools.js";
 import type * as analytics from "../analytics.js";
 import type * as authbridge from "../authbridge.js";
 import type * as http from "../http.js";
@@ -30,6 +31,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  adminTools: typeof adminTools;
   analytics: typeof analytics;
   authbridge: typeof authbridge;
   http: typeof http;

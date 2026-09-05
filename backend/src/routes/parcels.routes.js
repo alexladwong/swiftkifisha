@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, objectId, generateTrackingId } from "../lib/db.js";
-import { calculatePrice } from "../lib/pricing.js";
+import { calculatePrice, calculateQuote } from "../lib/pricing.js";
 import {
   PARCEL_CATEGORIES, DELIVERY_TYPES, SHIPMENT_TYPES, PARCEL_STATUSES,
   UGANDA_CITIES, UGANDA_REGION_NAMES,
@@ -30,7 +30,7 @@ function parseCountryCity(destinationCity) {
 /**
  * Validates a parcel or a quote.
  *  - national: both cities must be Ugandan cities (domestic service)
- *  - international: origin is a SwiftPak hub country or Uganda; destination is
+ *  - international: origin is a SwiftUg hub country or Uganda; destination is
  *    any worldwide country (given via destinationCountry and/or
  *    "Country, Capital" destinationCity).
  */
@@ -74,7 +74,7 @@ function validateParcelInput(body, { full = false } = {}) {
     destinationCountry = UG;
   } else {
     if (originCountry !== UG && !HUB_COUNTRY_NAMES.includes(originCountry)) {
-      errors.push(`Origin country must be Uganda or one of our shop-and-ship hubs (${HUB_COUNTRY_NAMES.join(", ")}).`);
+      errors.push(`Origin country must be Uganda or one of our Fikisha hubs (${HUB_COUNTRY_NAMES.join(", ")}).`);
     }
     if (destinationCountry) {
       const known = WORLD_COUNTRIES_WITH_CAPITALS.find((o) => o.country === destinationCountry);
@@ -118,13 +118,17 @@ function checkpointRecord({ status, location, message, at = new Date() }) {
 /**
  * POST /api/parcels/calculate-cost  (public)
  * Domestic:   { shipmentType:"national", originCity, destinationCity, parcelCategory, weight, deliveryType }
- * Shop&Ship:  { shipmentType:"international", originCountry:"United States", destinationCountry:"Uganda",
+ * Fikisha:  { shipmentType:"international", originCountry:"United States", destinationCountry:"Uganda",
  *               destinationCity?:"Kampala", parcelCategory, weight, deliveryType }
  */
 router.post("/calculate-cost", ah(async (req, res) => {
   const { errors, values } = validateParcelInput(req.body || {}, { full: false });
   if (errors.length) return res.status(400).json({ message: errors[0], errors });
-  const { price, currency } = calculatePrice(values);
+  const quote = calculateQuote(values);
+  const extras =
+    quote.currency === "UGX"
+      ? { distanceKm: quote.distanceKm ?? null, billableWeight: quote.billableWeight, breakdown: quote.breakdown ?? null }
+      : { billableWeight: quote.billableWeight };
   return res.json({
     type: values.deliveryType,          // key used by the customer cost page
     deliveryType: values.deliveryType,
@@ -135,8 +139,9 @@ router.post("/calculate-cost", ah(async (req, res) => {
     originCountry: values.originCountry,
     destinationCountry: values.destinationCountry,
     weight: values.weight,
-    price,
-    currency,
+    price: quote.price,
+    currency: quote.currency,
+    ...extras,
   });
 }));
 

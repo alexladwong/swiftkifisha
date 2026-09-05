@@ -131,7 +131,7 @@ const CalculateCostPage = () => {
   const hubFor = (country) => SHOP_HUB_OPTIONS.find((h) => h.value === country);
 
   return (
-    <div className="min-h-screen pt-24 pb-20">
+    <div className="min-h-screen pb-20 pt-8 md:pt-14">
       <div className="container mx-auto px-4 md:px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -142,7 +142,7 @@ const CalculateCostPage = () => {
             Estimate Your International Shipping Fee
           </h1>
           <p className="mt-2 text-muted-foreground max-w-xl mx-auto">
-            Shop from your SwiftPak mailbox abroad and see exactly what delivery to your door costs.
+            Shop from your SwiftUg mailbox abroad and see exactly what delivery to your door costs.
           </p>
         </motion.div>
 
@@ -235,7 +235,7 @@ const CalculateCostPage = () => {
                           {form.destinationCountry}. Fee includes hub pickup and international delivery.
                         </>
                       ) : (
-                        <>Pick your SwiftPak mailbox country, then the delivery country and its city / region.</>
+                        <>Pick your SwiftUg mailbox country, then the delivery country and its city / region.</>
                       )}
                     </p>
                   </>
@@ -355,6 +355,27 @@ const CalculateCostPage = () => {
                     <span className="text-muted-foreground">Weight</span>
                     <span className="font-medium text-foreground">{result.weight} kg</span>
                   </div>
+                  {result.billableWeight && result.billableWeight !== result.weight && (
+                    <div className="flex justify-between py-2 border-b border-border/50">
+                      <span className="text-muted-foreground">Billable weight (min 1 kg)</span>
+                      <span className="font-medium text-foreground">{result.billableWeight} kg</span>
+                    </div>
+                  )}
+                  {result.distanceKm != null && (
+                    <div className="flex justify-between py-2 border-b border-border/50">
+                      <span className="text-muted-foreground">Route distance (approx.)</span>
+                      <span className="font-medium text-foreground">~{result.distanceKm} km</span>
+                    </div>
+                  )}
+                  {result.breakdown && (
+                    <div className="rounded-md bg-muted/50 border border-border/60 px-3 py-2 text-xs space-y-1">
+                      <p className="font-semibold text-muted-foreground">How it is calculated</p>
+                      <p className="flex justify-between"><span>Booking & handling</span><span>UGX {Number(result.breakdown.baseFee).toLocaleString()}</span></p>
+                      <p className="flex justify-between"><span>Content ({result.parcelCategory?.replace(/_/g, " ") || "-"}, {result.billableWeight} kg)</span><span>UGX {Number(result.breakdown.contentFee).toLocaleString()}</span></p>
+                      <p className="flex justify-between"><span>Distance ({result.distanceKm} km)</span><span>UGX {Number(result.breakdown.distanceFee).toLocaleString()}</span></p>
+                      <p className="flex justify-between"><span>Delivery speed x{result.breakdown.deliveryMultiplier}</span><span>{result.breakdown.bulkDiscountApplied ? "bulk 10% off applied" : "no bulk discount"}</span></p>
+                    </div>
+                  )}
                   <div className="flex justify-between py-2">
                     <span className="text-muted-foreground">Estimated total</span>
                     <span className="font-bold text-lg text-accent">{formatMoney(result.price, result.currency)}</span>
@@ -362,7 +383,7 @@ const CalculateCostPage = () => {
                   <p className="text-xs text-muted-foreground">
                     {result.currency === "USD"
                       ? "Includes hub pickup and international delivery. Destination duties & taxes are billed at cost with full transparency."
-                      : "Includes handling and delivery within Uganda. UGX rates apply to domestic shipments."}
+                      : "Distance-based domestic pricing: booking + content + distance (km). Items under 1 kg are billed as 1 kg. UGX rates apply."}
                   </p>
                 </CardContent>
               </Card>
@@ -371,7 +392,7 @@ const CalculateCostPage = () => {
                 <div className="text-center text-muted-foreground">
                   <Calculator className="h-16 w-16 mx-auto mb-4 opacity-20" />
                   <p className="max-w-xs mx-auto">
-                    Estimate the door-to-door cost of shipping from any SwiftPak mailbox hub to your country.
+                    Estimate the door-to-door cost of shipping from any SwiftUg mailbox hub to your country.
                   </p>
                 </div>
               </div>

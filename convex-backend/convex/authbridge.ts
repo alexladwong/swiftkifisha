@@ -124,3 +124,25 @@ export const signUp = mutation({
     };
   },
 });
+
+// Member password change via Better Auth (session token-bound).
+export const changePassword = mutation({
+  args: { token: v.union(v.null(), v.string()), currentPassword: v.string(), newPassword: v.string() },
+  handler: async (ctx, args) => {
+    if (!args.currentPassword || !args.newPassword || args.newPassword.length < 8) {
+      throw new HttpError(400, "New password must be at least 8 characters.");
+    }
+    try {
+      const auth = createAuth(ctx);
+      await auth.api.changePassword({
+        body: { currentPassword: args.currentPassword, newPassword: args.newPassword },
+        headers: { authorization: "Bearer " + (args.token ?? "") },
+      });
+    } catch (err: any) {
+      const msg = err?.message ?? "";
+      if (/password/i.test(msg)) throw new HttpError(400, "Current password is incorrect.");
+      throw new HttpError(500, "Could not change password.");
+    }
+    return { message: "Password changed successfully" };
+  },
+});

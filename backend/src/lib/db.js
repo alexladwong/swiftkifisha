@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { config } from "../config.js";
+import { ensureEnabled, push } from "./remoteStore.js";
 
 /**
  * Minimal JSON-file datastore with Mongo-style "_id" values.
@@ -36,6 +37,11 @@ class JsonDb {
     const tmp = this.file + "." + process.pid + ".tmp";
     fs.writeFileSync(tmp, JSON.stringify(this.data, null, 2));
     fs.renameSync(tmp, this.file); // atomic replace
+    // Auto-sync: mirror every write to Neon Postgres when DATABASE_URL is set.
+    this._remoteChain = (this._remoteChain || Promise.resolve())
+      .then(() => ensureEnabled())
+      .then((ok) => (ok ? push(this.data) : false))
+      .catch((err) => console.error("[remote] sync failed:", err.message));
   }
 
   isEmpty() {

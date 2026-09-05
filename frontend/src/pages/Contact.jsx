@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 const contactInfo = [
   { icon: MapPin, label: 'Address', value: 'SwiftUg Global Operations, Business Bay, Dubai, United Arab Emirates' },
   { icon: Phone, label: 'Phone', value: '+971 4 123 4567' },
-  { icon: Mail, label: 'Email', value: 'care@swiftpak.com' },
+  { icon: Mail, label: 'Email', value: 'care@swiftug.com' },
 ];
 
 const Contact = () => {
@@ -34,7 +34,7 @@ const Contact = () => {
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-20">
+    <div className="min-h-screen pb-20 pt-8 md:pt-14">
       <div className="container mx-auto px-4 md:px-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
           <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground">Get In Touch</h1>

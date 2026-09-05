@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "REST API backend for the SwiftShip / SwiftPak courier management system (dashboard + customer frontend).",
+  "description": "REST API backend for the SwiftShip / SwiftUg courier management system (dashboard + customer frontend).",
   "main": "src/server.js",
   "engines": {
     "node": ">=18.0.0"
@@ -18,6 +18,7 @@
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "express": "^4.21.2",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.23.0"
   }
 }

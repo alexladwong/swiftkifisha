@@ -70,7 +70,7 @@ http.route({
 });
 
 http.route({ path: "/", method: "GET", handler: httpAction(async () => json(200, {
-  message: "SwiftPak Global API on Convex (precise-pig-300).",
+  message: "SwiftUg Global API on Convex (precise-pig-300).",
   health: "/api/health", endpoints: "see convex-backend/README.md",
 })) });
 
@@ -254,12 +254,67 @@ http.route({ path: "/api/members", method: "GET", handler: httpAction(async (ctx
 http.route({ pathPrefix: "/api/members/", method: "GET", handler: httpAction(async (ctx, req) => {
   try {
     const url = new URL(req.url);
-    const id = decodeURIComponent(url.pathname.slice("/api/members/".length));
-    const result = await ctx.runMutation(api.members.detail, { token: tokenOf(req), id });
+    const rest = decodeURIComponent(url.pathname.slice("/api/members/".length));
+    if (rest === "me") {
+      const result = await ctx.runMutation(api.members.me, { token: tokenOf(req) });
+      return json(200, result);
+    }
+    if (rest === "me/parcels") {
+      const result = await ctx.runMutation(api.members.myParcels, { token: tokenOf(req), limit: num(url.searchParams.get("limit"), 10) });
+      return json(200, result);
+    }
+    const result = await ctx.runMutation(api.members.detail, { token: tokenOf(req), id: rest });
     if (!result) return json(404, { message: "Member not found." });
     return json(200, result);
   } catch (e) { return err(e); }
 }) });
+
+http.route({
+  path: "/api/members/me", method: "PATCH",
+  handler: httpAction(async (ctx, req) => {
+    try {
+      const body = await readJson(req);
+      const result = await ctx.runMutation(api.members.updateMe, {
+        token: tokenOf(req),
+        name: body.name !== undefined ? String(body.name) : undefined,
+        phone: body.phone !== undefined ? String(body.phone) : undefined,
+        homeCity: body.homeCity !== undefined ? String(body.homeCity) : undefined,
+        homeCountry: body.homeCountry !== undefined ? String(body.homeCountry) : undefined,
+      });
+      return json(200, result);
+    } catch (e) { return err(e); }
+  }),
+});
+
+http.route({
+  path: "/api/auth/change-password", method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    try {
+      const body = await readJson(req);
+      const result = await ctx.runMutation(api.authbridge.changePassword, {
+        token: tokenOf(req),
+        currentPassword: String(body.currentPassword ?? ""),
+        newPassword: String(body.newPassword ?? ""),
+      });
+      return json(200, result);
+    } catch (e) { return err(e); }
+  }),
+});
+
+http.route({
+  path: "/api/change-password", method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    try {
+      const body = await readJson(req);
+      const result = await ctx.runMutation(api.authbridge.changePassword, {
+        token: tokenOf(req),
+        currentPassword: String(body.currentPassword ?? ""),
+        newPassword: String(body.newPassword ?? ""),
+      });
+      return json(200, result);
+    } catch (e) { return err(e); }
+  }),
+});
 
 // Preflight for custom routes.
 http.route({ pathPrefix: "/api/", method: "OPTIONS", handler: httpAction(async () => new Response(null, { status: 204, headers: CORS_HEADERS })) });

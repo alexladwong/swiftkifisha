@@ -19,6 +19,10 @@ export default {
       },
       colors: {
         border: "hsl(var(--border))",
+        surface: "hsl(var(--surface))",
+        "surface-muted": "hsl(var(--surface-muted))",
+        "primary-soft": "hsl(var(--primary-soft))",
+        "accent-soft": "hsl(var(--accent-soft))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
@@ -66,6 +70,13 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        xl: "calc(var(--radius) + 6px)",
+        "2xl": "calc(var(--radius) + 10px)",
+      },
+      boxShadow: {
+        soft: "0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -12px rgb(15 23 42 / 0.12)",
+        card: "0 1px 2px rgb(15 23 42 / 0.04), 0 14px 40px -18px rgb(15 23 42 / 0.22)",
+        drawer: "-18px 0 48px -24px rgb(15 23 42 / 0.25)",
       },
       keyframes: {
         "accordion-down": {
@@ -85,4 +96,3 @@ export default {
   },
   plugins: [tailwindcssAnimate],
 };
-

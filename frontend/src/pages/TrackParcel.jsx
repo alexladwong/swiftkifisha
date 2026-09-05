@@ -57,7 +57,7 @@ const TrackParcel = () => {
 
   return (
     <>
-      <div className="min-h-screen pt-24 pb-20">
+      <div className="min-h-screen pb-20 pt-8 md:pt-14">
         <div className="container mx-auto px-4 md:px-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}

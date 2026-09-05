@@ -1,7 +1,8 @@
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
-import { requireAdmin } from "./lib/authz";
+import { query, mutation } from "./_generated/server";
+import { requireAdmin, requireMember } from "./lib/authz";
 import { toUgx } from "./lib/pricingFx";
+import { createAuth } from "./betterAuth/auth";
 import type { AnyParcel } from "./lib/agg";
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
@@ -73,5 +74,49 @@ export const detail = mutation({
     const parcels = await ctx.db.query("parcels").withIndex("by_memberId", (q: any) => q.eq("memberId", args.id)).collect();
     parcels.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
     return { member, parcels: parcels.slice(0, 25) };
+  },
+});
+
+// Member portal (token-bound to their own profile/shipments).
+// Mutations (not queries): Better Auth session validation needs component-table reads.
+export const me = mutation({
+  args: { token: v.union(v.null(), v.string()) },
+  handler: async (ctx, args) => {
+    const { member } = await requireMember(ctx, args.token);
+    return { member };
+  },
+});
+
+export const myParcels = mutation({
+  args: { token: v.union(v.null(), v.string()), limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const { member } = await requireMember(ctx, args.token);
+    const limit = Math.min(Math.max(Number(args.limit) || 10, 1), 50);
+    const rows = (await ctx.db.query("parcels").collect())
+      .filter((p) => p.memberId === member._id || p.memberEmail === member.email)
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    return { data: rows.slice(0, limit), total: rows.length, limit };
+  },
+});
+
+export const updateMe = mutation({
+  args: { token: v.union(v.null(), v.string()), name: v.optional(v.string()), phone: v.optional(v.string()), homeCity: v.optional(v.string()), homeCountry: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const { member, user } = await requireMember(ctx, args.token);
+    const patch: any = {};
+    if (args.name !== undefined && String(args.name).trim()) patch.name = String(args.name).trim();
+    if (args.phone !== undefined && String(args.phone).trim()) patch.phone = String(args.phone).trim();
+    if (args.homeCity !== undefined && String(args.homeCity).trim()) patch.homeCity = String(args.homeCity).trim();
+    if (args.homeCountry !== undefined && String(args.homeCountry).trim()) patch.homeCountry = String(args.homeCountry).trim();
+    if (Object.keys(patch).length) await ctx.db.patch(member._id, patch);
+    // Keep the Better Auth display name in sync (best effort).
+    if (patch.name) {
+      try {
+        const auth = createAuth(ctx);
+        await auth.api.updateUser({ body: { name: patch.name }, headers: { authorization: "Bearer " + (args.token ?? "") } });
+      } catch { /* non-fatal: member row is source of truth for the portal */ }
+    }
+    const updated = await ctx.db.get(member._id);
+    return { message: "Profile updated successfully", member: updated };
   },
 });

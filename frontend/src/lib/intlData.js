@@ -1,5 +1,5 @@
 /**
- * SwiftUg Global — international shop-and-ship reference data.
+ * SwiftUg Global — international Fikisha reference data.
  * Mirrors backend/src/lib/intl.js so the public site can render hubs, served
  * countries and fee hints without a network round-trip.
  */

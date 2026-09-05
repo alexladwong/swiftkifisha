@@ -10,6 +10,18 @@ import { HUB_COUNTRIES, HUB_MAILBOX_EXAMPLES } from "../lib/intl.js";
 const router = Router();
 const publicUser = ({ _id, name, email, role, createdAt }) => ({ _id, name, email, role, createdAt });
 
+/** Attach the member profile (plan, mailboxes, home) to a signed-in member user. */
+function withMemberProfile(user) {
+  const profile = db.data.members.find((m) => m.email === user.email);
+  if (!profile) return publicUser(user);
+  return {
+    _id: user._id, name: user.name, email: user.email, role: user.role, createdAt: user.createdAt,
+    memberCode: profile.memberCode, plan: profile.plan,
+    homeCountry: profile.homeCountry, homeCity: profile.homeCity,
+    hubAddresses: profile.hubAddresses,
+  };
+}
+
 /** POST /api/auth/login  { email, password } -> { token, user } */
 router.post("/login", ah(async (req, res) => {
   const { email, password } = req.body || {};
@@ -115,6 +127,22 @@ router.post("/signup", ah(async (req, res) => {
     user: { _id: user._id, name: user.name, email: user.email, role: "member", createdAt: user.createdAt,
       memberCode, plan: member.plan, homeCountry: member.homeCountry, homeCity: member.homeCity, hubAddresses },
   });
+}));
+
+/** POST /api/auth/change-password (signed-in user) */
+router.post("/change-password", requireAuth, ah(async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  const user = db.data.users.find((u) => u._id === req.user._id);
+  if (!user) return res.status(401).json({ message: "Account not found." });
+  if (!currentPassword || !(await bcrypt.compare(String(currentPassword), user.passwordHash))) {
+    return res.status(400).json({ message: "Current password is incorrect." });
+  }
+  if (!newPassword || String(newPassword).length < 8) {
+    return res.status(400).json({ message: "New password must be at least 8 characters." });
+  }
+  user.passwordHash = await bcrypt.hash(String(newPassword), config.bcryptRounds ?? 10);
+  db.persist();
+  return res.json({ message: "Password changed successfully" });
 }));
 
 export default router;

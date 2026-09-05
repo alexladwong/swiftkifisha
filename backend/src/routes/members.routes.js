@@ -67,6 +67,40 @@ router.get("/", requireAuth, ah(async (req, res) => {
   return res.json({ data, page: safePage, limit, total, totalPages });
 }));
 
+/** GET /api/members/me (member, token-bound) - own profile */
+router.get("/me", requireAuth, ah(async (req, res) => {
+  const member = db.data.members.find((m) => m.email === req.user.email);
+  if (!member) return res.status(404).json({ message: "Member profile not found." });
+  return res.json({ member });
+}));
+
+/** GET /api/members/me/parcels (member) - own shipments */
+router.get("/me/parcels", requireAuth, ah(async (req, res) => {
+  const limit = clamp(parseInt(req.query.limit, 10) || 10, 1, 50);
+  const member = db.data.members.find((m) => m.email === req.user.email);
+  if (!member) return res.status(404).json({ message: "Member profile not found." });
+  const rows = db.data.parcels
+    .filter((p) => p.memberId === member._id || p.memberEmail === member.email)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return res.json({ data: rows.slice(0, limit), total: rows.length, limit });
+}));
+
+/** PATCH /api/members/me (member) - update own profile */
+router.patch("/me", requireAuth, ah(async (req, res) => {
+  const member = db.data.members.find((m) => m.email === req.user.email);
+  if (!member) return res.status(404).json({ message: "Member profile not found." });
+  const { name, phone, homeCity, homeCountry } = req.body || {};
+  if (name !== undefined && String(name).trim()) member.name = String(name).trim();
+  if (phone !== undefined && String(phone).trim()) member.phone = String(phone).trim();
+  if (homeCity !== undefined && String(homeCity).trim()) member.homeCity = String(homeCity).trim();
+  if (homeCountry !== undefined && String(homeCountry).trim()) member.homeCountry = String(homeCountry).trim();
+  const user = db.data.users.find((u) => u.email === member.email);
+  if (user && name !== undefined && String(name).trim()) user.name = member.name;
+  db.persist();
+  return res.json({ message: "Profile updated successfully", member });
+}));
+
+
 /** GET /api/members/:id  (admin) — member profile + hub addresses + recent parcels. */
 router.get("/:id", requireAuth, ah(async (req, res) => {
   const member = db.data.members.find((m) => m._id === req.params.id);

@@ -34,12 +34,12 @@ const services = [
 const ShopShip = () => {
   const totalCountries = useMemo(() => WORLD_COUNTRIES.length, []);
   return (
-    <div className="min-h-screen pt-24 pb-20">
+    <div className="min-h-screen pb-20 pt-8 md:pt-14">
       <div className="container mx-auto px-4 md:px-6">
         {/* Hero */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center max-w-3xl mx-auto mb-16">
           <Badge variant="outline" className="mb-4 gap-1.5 px-3 py-1 text-accent border-accent/30">
-            <Sparkles className="h-3.5 w-3.5" /> SwiftUg Shop &amp; Ship
+            <Sparkles className="h-3.5 w-3.5" /> SwiftUg Fikisha
           </Badge>
           <h1 className="font-display text-3xl md:text-5xl font-bold text-foreground leading-tight">
             One membership. <span className="text-accent">Addresses around the world.</span>
@@ -118,7 +118,7 @@ const ShopShip = () => {
         {/* How it works */}
         <div className="mb-20">
           <motion.div {...fadeUp} className="text-center mb-10">
-            <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground">How Shop &amp; Ship works</h2>
+            <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground">How Fikisha works</h2>
             <p className="mt-2 text-muted-foreground">From a checkout page anywhere in the world to your doorstep.</p>
           </motion.div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">

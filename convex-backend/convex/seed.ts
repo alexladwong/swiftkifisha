@@ -113,7 +113,7 @@ export const all = mutation({
       });
     }
 
-    // Parcels: ~1 in 4 are member shop-and-ship orders.
+    // Parcels: ~1 in 4 are member Fikisha orders.
     const allMembers: any[] = (await ctx.db.query("members").collect()) as any[];
     const now = Date.now();
     for (let i = 0; i < 64; i += 1) {

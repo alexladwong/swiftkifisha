@@ -133,7 +133,7 @@ if (created?._id) {
 }
 
 
-// ---- international shop-and-ship layer ----
+// ---- international Fikisha layer ----
 {
   const hubs = await j("/shop/hubs");
   check("shop hubs (public)", hubs.status === 200 && hubs.body?.hubs?.length === 7);

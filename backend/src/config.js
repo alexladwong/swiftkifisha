@@ -25,6 +25,7 @@ export const config = Object.freeze({
   jwtSecret: process.env.JWT_SECRET || "swiftship-dev-secret-change-me",
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
   dataFile: process.env.DB_FILE || path.join(root, "data", "db.json"),
+  databaseUrl: process.env.DATABASE_URL || "",
   bcryptRounds: 10,
   seedOnStart: (process.env.SEED_ON_START ?? "true") !== "false",
 });

@@ -40,3 +40,11 @@ export async function requireAdmin(ctx: DbCtx, token: string | null) {
   if (!admin) throw new HttpError(403, "Admin access required.");
   return { ...user, role: "admin" as const };
 }
+/** Returns the session user plus their members row (token-bound). */
+export async function requireMember(ctx: DbCtx, token: string | null) {
+  const user = await sessionUser(ctx, token);
+  if (!user) throw new HttpError(401, "Authentication required. Please log in.");
+  const member = await ctx.db.query("members").withIndex("by_email", (q: any) => q.eq("email", user.email as string)).first();
+  if (!member) throw new HttpError(403, "Member account required.");
+  return { user, member: member as any };
+}

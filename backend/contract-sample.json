@@ -26,7 +26,16 @@
     "destinationCountry": "string",
     "weight": "number",
     "price": "number",
-    "currency": "string"
+    "currency": "string",
+    "distanceKm": "number",
+    "billableWeight": "number",
+    "breakdown": {
+      "baseFee": "number",
+      "contentFee": "number",
+      "distanceFee": "number",
+      "deliveryMultiplier": "number",
+      "bulkDiscountApplied": "boolean"
+    }
   },
   "quoteInternational": {
     "type": "string",
@@ -39,7 +48,8 @@
     "destinationCountry": "string",
     "weight": "number",
     "price": "number",
-    "currency": "string"
+    "currency": "string",
+    "billableWeight": "number"
   },
   "parcelRow": {
     "_id": "string",
@@ -149,7 +159,7 @@
       "revenuePkr": "number",
       "revenueUSD": "number"
     },
-    "lastShipmentAt": "string"
+    "lastShipmentAt": "object"
   },
   "membersMeta": {
     "data": [

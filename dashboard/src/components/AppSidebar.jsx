@@ -28,7 +28,7 @@ const mainItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Create Parcel", url: "/create-parcel", icon: PackagePlus },
   { title: "Manage Parcels", url: "/manage-parcels", icon: Boxes },
-  { title: "Shop & Ship Members", url: "/members", icon: Users },
+  { title: "Fikisha Members", url: "/members", icon: Users },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Parcel Tracking", url: "/tracking", icon: Search },
   { title: "Add Admin", url: "/add-admin", icon: UserPlus },
@@ -54,7 +54,7 @@ export function AppSidebar() {
           </div>
           {!collapsed && (
             <span className="text-lg font-bold text-sidebar-foreground tracking-tight">
-             SwiftPak Global
+             SwiftUg Global
             </span>
           )}
         </div>

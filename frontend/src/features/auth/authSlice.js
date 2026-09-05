@@ -37,7 +37,7 @@ export const signupThunk = createAsyncThunk("auth/signup", async (payload, thunk
     const { data } = await axiosInstance.post(SIGNUP_PATH, payload);
     localStorage.setItem("token", data.token);
     localStorage.setItem("user", JSON.stringify(data.user || null));
-    toast.success("Account created - welcome to SwiftPak!");
+    toast.success("Account created - welcome to SwiftUg!");
     return data;
   } catch (error) {
     const message = getErrorMessage(error);
@@ -52,6 +52,10 @@ const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
+    updateUser: (state, action) => {
+      state.user = { ...(state.user || {}), ...action.payload };
+      localStorage.setItem("user", JSON.stringify(state.user));
+    },
     logout: (state) => {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
@@ -79,5 +83,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout } = authSlice.actions;
+export const { logout, updateUser } = authSlice.actions;
 export default authSlice.reducer;

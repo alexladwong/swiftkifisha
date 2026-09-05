@@ -1,5 +1,5 @@
 /**
- * International shop-and-ship reference data (SwiftPak Global).
+ * International Fikisha reference data (SwiftUg Global).
  * Members hold virtual mailbox addresses in "hub" countries; we receive their
  * online orders there and ship worldwide. Domestic service within Uganda
  * is UGX; every international shipment is quoted in USD.
@@ -68,10 +68,10 @@ export const MEMBER_PLANS = ["Saver", "Classic", "Pro"];
 /** Colourful example mailboxes per hub — shown on the public hub page. */
 export const HUB_MAILBOX_EXAMPLES = {
   "United States": ["101 Fifth Avenue, Suite SP-100", "New York, NY 10003, USA"],
-  "United Kingdom": ["Unit 7 SwiftPak House, 48 Farringdon Road", "London EC1M 3DG, United Kingdom"],
+  "United Kingdom": ["Unit 7 SwiftUg House, 48 Farringdon Road", "London EC1M 3DG, United Kingdom"],
   "United Arab Emirates": ["Office 204, Building 12, Business Bay", "Dubai, United Arab Emirates"],
-  Germany: ["SwiftPak Logistics GmbH, Frachtweg 9", "60327 Frankfurt am Main, Germany"],
+  Germany: ["SwiftUg Logistics GmbH, Frachtweg 9", "60327 Frankfurt am Main, Germany"],
   China: ["Room 2101, Tower B, 88 Century Avenue, Pudong", "Shanghai 200120, China"],
-  Singapore: ["28 Tuas Avenue 6, #03-11 SwiftPak Hub", "Singapore 639318"],
+  Singapore: ["28 Tuas Avenue 6, #03-11 SwiftUg Hub", "Singapore 639318"],
   "Hong Kong": ["Unit 806, 8/F, Harbour View Centre, 120 Texaco Road", "Tsuen Wan, Hong Kong"],
 };

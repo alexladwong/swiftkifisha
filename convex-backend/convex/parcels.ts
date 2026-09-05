@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
-import { calculatePrice } from "./lib/pricing";
+import { calculatePrice, calculateQuote } from "./lib/pricing";
 import { requireAdmin, HttpError } from "./lib/authz";
 import { UGANDA_CITIES, UGANDA_REGION_NAMES, CATEGORIES, DELIVERY_TYPES, SHIPMENT_TYPES, STATUSES, HUB_COUNTRIES } from "./lib/intl";
 
@@ -47,7 +47,7 @@ export function quotePayload(args: Record<string, any>) {
   let destinationCountry = str(args.destinationCountry) || "Uganda";
   if (shipmentType === "international") {
     if (originCountry !== "Uganda" && !HUB_COUNTRIES.some((h) => h.country === originCountry)) {
-      throw new HttpError(400, "Origin country must be Uganda or one of our shop-and-ship hubs.");
+      throw new HttpError(400, "Origin country must be Uganda or one of our Fikisha hubs.");
     }
   } else {
     const o = str(args.originCity); const d = str(args.destinationCity);
@@ -56,7 +56,7 @@ export function quotePayload(args: Record<string, any>) {
     if (o === d) throw new HttpError(400, "Origin and destination cities cannot be the same.");
     originCountry = "Uganda"; destinationCountry = "Uganda";
   }
-  const { price, currency } = calculatePrice({ shipmentType, parcelCategory, weight, deliveryType, originCountry, destinationCountry });
+  const q = calculateQuote({ shipmentType, parcelCategory, weight, deliveryType, originCountry, destinationCountry, originCity: str(args.originCity), destinationCity: str(args.destinationCity) });
   const hub = HUB_COUNTRIES.find((h) => h.country === originCountry);
   const defaultOriginCity = hub ? hub.city + ", " + hub.country : originCountry;
   return {
@@ -69,8 +69,10 @@ export function quotePayload(args: Record<string, any>) {
     originCountry,
     destinationCountry,
     weight,
-    price,
-    currency,
+    price: q.price,
+    currency: q.currency,
+    billableWeight: q.billableWeight,
+    ...(q.currency === "UGX" ? { distanceKm: q.distanceKm ?? null, breakdown: q.breakdown ?? null } : {}),
   };
 }
 
