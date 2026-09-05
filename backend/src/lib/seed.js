@@ -264,7 +264,7 @@ export async function buildDemoData() {
       const receiverName = randomName();
       const plan = planFlow(ageDays, createdAtMs, now);
       const targetDays = deliveryTargetDays({ shipmentType, deliveryType });
-      const deliveredAt = deliveredAtFor({ createdAtMs, targetDays, isDelivered: plan.isDelivered, now });
+      const deliveredAt = adjustDelivered(plan, deliveredAtFor({ createdAtMs, targetDays, isDelivered: plan.isDelivered, now }), now);
       parcel = buildParcelBase({
         createdAtMs, now, flow: plan.flow, steps: plan.steps, arrivedAt: plan.arrivedAt, deliveredAt,
         senderName,
@@ -285,7 +285,7 @@ export async function buildDemoData() {
       const destinationCity = member.homeCity;
       const plan = planFlow(ageDays, createdAtMs, now);
       const targetDays = deliveryTargetDays({ shipmentType, deliveryType });
-      const deliveredAt = deliveredAtFor({ createdAtMs, targetDays, isDelivered: plan.isDelivered, now });
+      const deliveredAt = adjustDelivered(plan, deliveredAtFor({ createdAtMs, targetDays, isDelivered: plan.isDelivered, now }), now);
       parcel = buildParcelBase({
         createdAtMs, now, flow: plan.flow, steps: plan.steps, arrivedAt: plan.arrivedAt, deliveredAt,
         senderName: storeName,
