@@ -1,130 +1,253 @@
 import { useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { X, Package } from "lucide-react";
 
-/**
- * Full-height off-canvas drawer (right or left).
- * - flex column: fixed header / scrollable content / fixed footer -> no clipping
- * - overlay fade ~200ms, panel slide 260ms cubic-bezier(0.4,0,0.2,1)
- * - closes on X, overlay and Escape; focus trapped; returns to trigger on close
- * - body scroll locked while open; drawer scrolls independently
- */
+import { X } from "lucide-react";
+
 export default function SideDrawer({
   open,
   onClose,
-  label = "Menu",
+  label = "Navigation menu",
   children,
-  footer = null,
-  widthClass = "w-[min(430px,94vw)]",
-  side = "right",
+  triggerRef,
 }) {
-  const panelRef = useRef(null);
-  const triggerRef = useRef(null);
+  const drawerRef = useRef(null);
 
+  const closeButtonRef = useRef(null);
+
+  /*
+   * Lock background scrolling while drawer is open.
+   */
   useEffect(() => {
-    if (open) {
-      triggerRef.current = document.activeElement;
-      const prevOverflow = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      const t = window.setTimeout(() => panelRef.current?.focus(), 60);
-      return () => {
-        window.clearTimeout(t);
-        document.body.style.overflow = prevOverflow;
-      };
-    }
-    return undefined;
+    if (!open) return;
+
+    const previousOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow =
+      "hidden";
+
+    return () => {
+      document.body.style.overflow =
+        previousOverflow;
+    };
   }, [open]);
 
+  /*
+   * Escape to close.
+   */
   useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (e) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
+    if (!open) return;
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
         onClose();
+      }
+    };
+
+    document.addEventListener(
+      "keydown",
+      handleKeyDown,
+    );
+
+    return () => {
+      document.removeEventListener(
+        "keydown",
+        handleKeyDown,
+      );
+    };
+  }, [open, onClose]);
+
+  /*
+   * Focus close button when opened.
+   */
+  useEffect(() => {
+    if (!open) return;
+
+    const timeout =
+      window.setTimeout(() => {
+        closeButtonRef.current?.focus();
+      }, 50);
+
+    return () =>
+      window.clearTimeout(timeout);
+  }, [open]);
+
+  /*
+   * When the drawer closes (or its content navigates away), no focus may stay
+   * inside the aria-hidden subtree — blur anything still focused in it.
+   */
+  useEffect(() => {
+    if (open) return;
+    const drawer = drawerRef.current;
+    if (drawer && drawer.contains(document.activeElement)) {
+      document.activeElement.blur();
+    }
+  }, [open]);
+
+  /*
+   * Return focus to menu button when closed.
+   */
+  const handleClose = () => {
+    onClose();
+
+    window.setTimeout(() => {
+      triggerRef?.current?.focus();
+    }, 0);
+  };
+
+  /*
+   * Basic focus trap.
+   */
+  useEffect(() => {
+    if (!open) return;
+
+    const drawer =
+      drawerRef.current;
+
+    if (!drawer) return;
+
+    const handleTab = (event) => {
+      if (event.key !== "Tab") {
         return;
       }
-      if (e.key !== "Tab" || !panelRef.current) return;
-      const nodes = panelRef.current.querySelectorAll(
-        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      );
-      if (!nodes.length) return;
-      const first = nodes[0];
-      const last = nodes[nodes.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
+
+      const focusable = drawer.querySelectorAll([
+            "a[href]",
+            "button:not([disabled])",
+            "input:not([disabled])",
+            "select:not([disabled])",
+            "textarea:not([disabled])",
+            '[tabindex]:not([tabindex="-1"])',
+        ].join(","));
+
+      if (!focusable.length) {
+        return;
+      }
+
+      const first =
+        focusable[0];
+
+      const last =
+        focusable[
+          focusable.length - 1
+        ];
+
+      if (
+        event.shiftKey &&
+        document.activeElement === first
+      ) {
+        event.preventDefault();
         last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
+      } else if (
+        !event.shiftKey &&
+        document.activeElement === last
+      ) {
+        event.preventDefault();
         first.focus();
       }
     };
-    document.addEventListener("keydown", onKey, true);
-    return () => document.removeEventListener("keydown", onKey, true);
-  }, [open, onClose]);
 
-  const restoreFocus = () => {
-    if (triggerRef.current?.focus) triggerRef.current.focus();
-  };
+    document.addEventListener(
+      "keydown",
+      handleTab,
+    );
 
-  const from = side === "left" ? "-100%" : "100%";
+    return () => {
+      document.removeEventListener(
+        "keydown",
+        handleTab,
+      );
+    };
+  }, [open]);
 
   return (
-    <AnimatePresence onExitComplete={restoreFocus}>
-      {open && (
-        <>
-          {/* Overlay */}
-          <motion.button
-            aria-label="Close menu"
-            className="fixed inset-0 z-[70] cursor-default bg-[rgba(15,23,42,0.5)] backdrop-blur-[1.5px]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onClick={onClose}
-          />
-          {/* Panel */}
-          <motion.aside
-            ref={panelRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label={label}
-            tabIndex={-1}
-            className={
-              "fixed inset-y-0 z-[80] flex h-dvh w-full flex-col bg-white outline-none " +
-              (side === "left" ? "left-0 border-r border-border shadow-[18px_0_48px_-24px_rgba(15,23,42,0.28)] " : "right-0 shadow-drawer ") +
-              widthClass
-            }
-            initial={{ x: from }}
-            animate={{ x: 0 }}
-            exit={{ x: from }}
-            transition={{ type: "tween", duration: 0.26, ease: [0.4, 0, 0.2, 1] }}
+    <div
+      className={[
+        "fixed inset-0 z-[100]",
+        open
+          ? "pointer-events-auto"
+          : "pointer-events-none",
+      ].join(" ")}
+      aria-hidden={!open}
+    >
+      {/* Background overlay */}
+      <button
+        type="button"
+        aria-label="Close navigation"
+        onClick={handleClose}
+        tabIndex={open ? 0 : -1}
+        className={[
+          "absolute inset-0",
+          "bg-slate-950/45",
+          "transition-opacity duration-200",
+          open
+            ? "opacity-100"
+            : "opacity-0",
+        ].join(" ")}
+      />
+
+      {/* Right-side drawer */}
+      <div
+        id="swiftkifisha-navigation-drawer"
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
+        className={[
+          "absolute right-0 top-0",
+          "flex h-dvh flex-col",
+          /*
+           * THIS IS THE IMPORTANT WIDTH FIX.
+           *
+           * Mobile:
+           * 90% viewport width.
+           *
+           * Larger screens:
+           * 390px.
+           *
+           * Maximum:
+           * 420px.
+           */
+          "w-[90vw]",
+          "sm:w-[390px]",
+          "lg:w-[400px]",
+          "max-w-[420px]",
+          "bg-white",
+          "shadow-[-18px_0_50px_-25px_rgba(15,23,42,0.35)]",
+          "transition-transform duration-300",
+          "ease-[cubic-bezier(0.4,0,0.2,1)]",
+          open
+            ? "translate-x-0"
+            : "translate-x-full",
+        ].join(" ")}
+      >
+        {/* Drawer header */}
+        <div className="flex h-[76px] shrink-0 items-center justify-between border-b border-border px-5 sm:px-6">
+          <span className="font-display text-xl font-extrabold tracking-tight text-foreground">
+            Swift
+            <span className="text-accent">
+              Kifisha
+            </span>
+          </span>
+
+          <button
+            ref={closeButtonRef}
+            type="button"
+            onClick={handleClose}
+            aria-label="Close navigation"
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-white text-foreground transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           >
-            {/* Header: fixed, never overlapped by content */}
-            <div className="flex h-[72px] shrink-0 items-center justify-between border-b border-border/80 px-6">
-              <p className="flex items-center gap-2.5 font-display text-lg font-extrabold tracking-tight text-foreground">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Package className="h-4 w-4" strokeWidth={2.2} />
-                </span>
-                Swift<span className="text-accent">Ug</span>
-              </p>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close navigation"
-                className="flex h-11 w-11 items-center justify-center rounded-[10px] border border-border text-slate-500 transition-colors hover:bg-surface hover:text-foreground"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+            <X
+              className="h-5 w-5"
+              strokeWidth={2}
+            />
+          </button>
+        </div>
 
-            {/* Content: flex-1, own scroll */}
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-6 md:px-6">{children}</div>
-
-            {/* Footer: optional persistent controls */}
-            {footer && <div className="shrink-0 border-t border-border/80">{footer}</div>}
-          </motion.aside>
-        </>
-      )}
-    </AnimatePresence>
+        {/* Scrollable navigation */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6 sm:py-6">
+          {children}
+        </div>
+      </div>
+    </div>
   );
 }

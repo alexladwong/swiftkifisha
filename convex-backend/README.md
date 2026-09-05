@@ -66,6 +66,10 @@ API_PROXY=https://precise-pig-300.convex.site npm run dev
 |---|---|---|---|
 | POST | /api/auth/login | – | authbridge.login (Better Auth email+password; returns {token,user}) |
 | POST | /api/auth/add-user | Bearer admin | authbridge.addUser |
+| POST | /api/auth/forgot-password | – | authbridge.forgotPassword ({email, origin?} → {message, devResetLink?}) |
+| POST | /api/auth/reset-password | – | authbridge.resetPassword ({token, newPassword}) |
+| GET | /api/auth/social/providers | – | env-driven list of configured social providers |
+| GET | /api/auth/social/session | session cookie | authbridge.socialSession (OAuth callback → {token,user}) |
 | GET | /api/parcels?page&limit&search&member&originCountry&destinationCountry | Bearer admin | parcels.list |
 | POST | /api/parcels | Bearer admin | parcels.create |
 | GET | /api/parcels/track/:trackingId | – | parcels.track (incl. customer alias keys) |
@@ -113,6 +117,48 @@ convex/
   complains about overlapping paths, move them to `/api/login` and
   `/api/add-user` in `convex/http.ts` (one-line change, update the dashboard
   slice URL accordingly).
+- Password reset is owned by the custom bridge above — NOT by Better Auth's
+  native `request-password-reset` flow. The exact `/api/auth/reset-password`
+  route intentionally shadows the Better Auth prefix handler, so do not enable
+  Better Auth's `sendResetPassword` (native tokens could never be redeemed).
+- Reset tokens: one outstanding token per email (requesting a new one
+  invalidates the old), 60-minute TTL, single-use, stored in the `resetTokens`
+  table. No email provider is configured yet: outside production the reset
+  link is logged and returned as `devResetLink` (built from the caller's
+  Origin, falling back to `FRONTEND_URL`/`SITE_URL`/localhost:5173). In
+  production the link is only logged unless `RESET_LINK_DEBUG=true` — see
+  `.env.example`.
+
+## Social sign-in (Google)
+
+Better Auth ships built-in OAuth providers; this deployment exposes
+**Google**. It activates only when both credentials exist in the env — set
+them with `npx convex env set …` and see `.env.example`:
+
+| Variable | Value |
+|---|---|
+| BETTER_AUTH_GOOGLE_ID | Google OAuth client ID |
+| BETTER_AUTH_GOOGLE_SECRET | Google OAuth client secret |
+
+The Google OAuth app must whitelist the **redirect URI**
+`https://precise-pig-300.convex.site/api/auth/callback/google`. The sign-in
+UIs fetch `GET /api/auth/social/providers` and only
+render buttons for configured providers, then send users to Better Auth's
+native `/api/auth/sign-in/social?provider=…&callbackURL=…`. After the provider
+round-trip, the frontend callback page exchanges the session cookie for the
+regular `{ token, user }` contract via `GET /api/auth/social/session`
+(authbridge.socialSession); first social sign-in auto-provisions a member
+profile (same defaults as email sign-up).
+
+> Email: password-reset delivery on Convex uses the Brevo API when
+> `SENDINBLUE_API_KEY` is set (SMTP sockets are not available in the Convex
+> runtime). The Express backend (`../backend`) delivers through the Hostinger
+> SMTP credentials in its `.env`.
+
+> Cross-origin deployments: when the frontends call the Convex site directly
+> (`VITE_API_BASE_URL=https://…convex.site/api`), set `CROSS_SITE_AUTH=true` so
+> session cookies use SameSite=None over HTTPS. If `/api` is same-origin or
+> reverse-proxied (like the Vite dev proxy), leave it unset.
 
 ## Live verification (production)
 

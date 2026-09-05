@@ -2,38 +2,46 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { ChevronRight, LogOut } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { useI18n } from "@/i18n";
+
+const GROUP_KEYS = {
+  main: "main",
+  support: "support",
+  company: "company",
+};
 
 const GROUPS = [
   {
-    label: "Main",
+    key: "main",
     items: [
-      { label: "Home", to: "/", end: true },
-      { label: "Kifisha", to: "/shop-ship" },
-      { label: "Track", to: "/track" },
-      { label: "Estimate", to: "/calculate" },
+      { labelKey: "nav.home", to: "/", end: true },
+      { labelKey: "nav.kifisha", to: "/shop-ship" },
+      { labelKey: "nav.track", to: "/track" },
+      { labelKey: "nav.estimate", to: "/calculate" },
     ],
   },
   {
-    label: "Support",
+    key: "support",
     items: [
-      { label: "Help centre", to: "/contact" },
-      { label: "Contact support", to: "/contact" },
+      { labelKey: "drawer.helpCentre", to: "/contact" },
+      { labelKey: "drawer.contactSupport", to: "/contact" },
     ],
   },
   {
-    label: "Company",
+    key: "company",
     items: [
-      { label: "About SwiftKifisha", to: "/about" },
-      { label: "Mailbox hubs", to: "/shop-ship" },
+      { labelKey: "drawer.aboutSwiftKifisha", to: "/about" },
+      { labelKey: "drawer.mailboxHubs", to: "/shop-ship" },
     ],
   },
 ];
 
 const MEMBER_ITEMS = [
-  { label: "My Account", to: "/account", end: true },
-  { label: "My Addresses", to: "/account/addresses" },
-  { label: "My Shipments", to: "/account" },
-  { label: "Security", to: "/account/security" },
+  { labelKey: "drawer.myAccount", to: "/account", end: true },
+  { labelKey: "drawer.myAddresses", to: "/account/addresses" },
+  { labelKey: "drawer.myShipments", to: "/account" },
+  { labelKey: "drawer.security", to: "/account/security" },
 ];
 
 const initialsOf = (name) =>
@@ -65,15 +73,16 @@ function GroupLabel({ children }) {
 
 export default function DrawerNav({ onNavigate, onOpenAuth, onSignOut }) {
   const { token, user } = useSelector((state) => state.auth);
+  const { t } = useI18n();
 
   return (
     <div className="flex flex-col gap-7">
       {GROUPS.map((group) => (
-        <section key={group.label}>
-          <GroupLabel>{group.label}</GroupLabel>
+        <section key={group.key}>
+          <GroupLabel>{t("drawer." + GROUP_KEYS[group.key])}</GroupLabel>
           <div className="space-y-1">
             {group.items.map((item) => (
-              <Row key={group.label + item.to + item.label} to={item.to} end={item.end} label={item.label} onNavigate={onNavigate} />
+              <Row key={group.key + item.to + item.labelKey} to={item.to} end={item.end} label={t(item.labelKey)} onNavigate={onNavigate} />
             ))}
           </div>
         </section>
@@ -81,11 +90,11 @@ export default function DrawerNav({ onNavigate, onOpenAuth, onSignOut }) {
 
       {/* Member */}
       <section>
-        <GroupLabel>{token && user ? "Member" : "Account"}</GroupLabel>
+        <GroupLabel>{token && user ? t("drawer.member") : t("drawer.account")}</GroupLabel>
         {token && user ? (
           <div className="space-y-1">
             {MEMBER_ITEMS.map((item) => (
-              <Row key={item.to} to={item.to} end={item.end} label={item.label} onNavigate={onNavigate} />
+              <Row key={item.labelKey} to={item.to} end={item.end} label={t(item.labelKey)} onNavigate={onNavigate} />
             ))}
           </div>
         ) : (
@@ -95,14 +104,14 @@ export default function DrawerNav({ onNavigate, onOpenAuth, onSignOut }) {
               onClick={() => onOpenAuth("signup")}
               className="flex h-11 w-full items-center justify-center rounded-[10px] bg-accent text-[15px] font-bold text-white transition-colors hover:bg-accent/90"
             >
-              Create free account
+              {t("drawer.createAccount")}
             </button>
             <button
               type="button"
               onClick={() => onOpenAuth("signin")}
               className="flex h-11 w-full items-center justify-center rounded-[10px] border border-[#e5eaf2] bg-white text-[15px] font-semibold text-slate-700 transition-colors hover:border-slate-300"
             >
-              Sign in to my account
+              {t("drawer.signIn")}
             </button>
           </div>
         )}
@@ -124,20 +133,18 @@ export default function DrawerNav({ onNavigate, onOpenAuth, onSignOut }) {
             <button
               type="button"
               onClick={onSignOut}
-              aria-label="Sign out"
+              aria-label={t("drawer.signOutAria")}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-slate-500 transition-colors hover:border-destructive/30 hover:text-destructive"
             >
               <LogOut className="h-4 w-4" />
             </button>
           </div>
         )}
-        <div className="flex items-center gap-2 px-1">
+        <div className="flex flex-wrap items-center gap-2 px-1">
           <span className="inline-flex items-center rounded-md bg-surface-muted px-2.5 py-1 text-[12px] font-semibold text-slate-500">
-            🇺🇬 Uganda · Global
+            {t("drawer.ugandaGlobal")}
           </span>
-          <span className="inline-flex items-center rounded-md bg-surface-muted px-2.5 py-1 text-[12px] font-semibold text-slate-500">
-            English
-          </span>
+          <LanguageSwitcher compact onSelect={onNavigate} />
         </div>
       </section>
     </div>

@@ -9,6 +9,8 @@ import ManageParcels from "@/pages/ManageParcels";
 import ParcelDetails from "@/pages/ParcelDetails";
 import ParcelTracking from "@/pages/ParcelTracking";
 import LoginPage from "@/pages/Login";
+import ResetPasswordPage from "@/pages/ResetPassword";
+import SocialCallbackPage from "@/pages/SocialCallback";
 import NotFound from "@/pages/NotFound";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Analytics from "./pages/Analytics";
@@ -22,6 +24,8 @@ const App = () => (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/auth/callback" element={<SocialCallbackPage />} />
 
         <Route element={<ProtectedRoute />}>
           <Route element={<DashboardLayout />}>

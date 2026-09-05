@@ -126,3 +126,28 @@ Remove `DATABASE_URL` from `.env` to run purely on the local JSON file.
 
 > Note: the Convex production backend (`convex-backend/`) keeps its own
 > managed database; Neon sync applies to the Express API (`backend/`).
+
+## Google sign-in (members)
+
+The Express API mirrors the Better Auth social contract so both frontends work
+against it unchanged:
+
+- `GET /api/auth/social/providers` → `["google"]` when
+  `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET` are set (they are, in `.env`).
+- `GET /api/auth/sign-in/social?provider=google&callbackURL=…` → 302 to Google.
+- `GET /api/auth/callback/google?code=&state=` → exchanges the code, finds or
+  creates the user (new accounts become members with the Saver mailbox
+  profile; existing admins keep their role), sets the `sk_session` cookie and
+  redirects to `callbackURL`.
+- `GET /api/auth/social/session` → returns `{ token, user }` from the cookie so
+  the frontend `/auth/callback` page can store the session like an email login.
+
+**Google console setup** — Authorized redirect URIs must include (add both for
+local dev; register any deployed frontend origin too):
+- `http://localhost:5173/api/auth/callback/google`
+- `http://localhost:5174/api/auth/callback/google`
+
+The Convex deployment uses the same OAuth client with
+`https://precise-pig-300.convex.site/api/auth/callback/google`. Admin dashboard
+login is passwordless email+OTP (see `/api/auth/admin/otp/*`); Google sign-in
+is for members on the customer site.

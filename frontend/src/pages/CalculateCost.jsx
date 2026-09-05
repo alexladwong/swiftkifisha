@@ -24,31 +24,32 @@ import {
   UGANDA_REGION_GROUPS,
   formatMoney,
 } from "@/lib/intlData";
+import { useI18n } from "@/i18n";
 
 const categories = [
-  { value: "document", label: "Document" },
-  { value: "electronics", label: "Electronics" },
-  { value: "fragile", label: "Fragile" },
-  { value: "clothing", label: "Clothing" },
-  { value: "food", label: "Food" },
-  { value: "medicine", label: "Medicine" },
-  { value: "cosmetics", label: "Cosmetics" },
-  { value: "books", label: "Books" },
-  { value: "small_package", label: "Small Package" },
-  { value: "large_package", label: "Large Package" },
+  { value: "document", labelKey: "calculator.categoryDocument" },
+  { value: "electronics", labelKey: "calculator.categoryElectronics" },
+  { value: "fragile", labelKey: "calculator.categoryFragile" },
+  { value: "clothing", labelKey: "calculator.categoryClothing" },
+  { value: "food", labelKey: "calculator.categoryFood" },
+  { value: "medicine", labelKey: "calculator.categoryMedicine" },
+  { value: "cosmetics", labelKey: "calculator.categoryCosmetics" },
+  { value: "books", labelKey: "calculator.categoryBooks" },
+  { value: "small_package", labelKey: "calculator.categorySmallPackage" },
+  { value: "large_package", labelKey: "calculator.categoryLargePackage" },
 ];
 
 const deliveryOptions = (intl) =>
   intl
     ? [
-        { value: "standard", label: "Standard (5–9 days)" },
-        { value: "overnight", label: "Express (2–4 days)" },
-        { value: "sameDay", label: "Priority (1–2 days)" },
+        { value: "standard", labelKey: "calculator.speedStandardIntl" },
+        { value: "overnight", labelKey: "calculator.speedExpressIntl" },
+        { value: "sameDay", labelKey: "calculator.speedPriorityIntl" },
       ]
     : [
-        { value: "standard", label: "Standard (2–5 days)" },
-        { value: "overnight", label: "Overnight" },
-        { value: "sameDay", label: "Same Day" },
+        { value: "standard", labelKey: "calculator.speedStandardDom" },
+        { value: "overnight", labelKey: "calculator.speedOvernightDom" },
+        { value: "sameDay", labelKey: "calculator.speedSameDayDom" },
       ];
 
 const EMPTY = { originCity: "", destinationCity: "", originHub: "", destinationCountry: "", parcelCategory: "", weight: 1, deliveryType: "standard" };
@@ -69,6 +70,7 @@ const groupedUgandaOptions = UGANDA_REGION_GROUPS.map((g) => ({
 }));
 
 const CalculateCostPage = () => {
+  const { t } = useI18n();
   const [shipmentType, setShipmentType] = useState("international");
   const [form, setForm] = useState({ ...EMPTY });
 
@@ -77,7 +79,6 @@ const CalculateCostPage = () => {
   const { toast } = useToast();
 
   const isIntl = shipmentType === "international";
-
 
   const changeShipmentType = (v) => {
     setShipmentType(v);
@@ -91,8 +92,8 @@ const CalculateCostPage = () => {
         : !form.originCity || !form.destinationCity;
     if (missing || !form.parcelCategory) {
       toast({
-        title: "Missing fields",
-        description: "Please fill in all required fields.",
+        title: t("calculator.missingTitle"),
+        description: t("calculator.missingDesc"),
         variant: "destructive",
       });
       return;
@@ -121,8 +122,8 @@ const CalculateCostPage = () => {
       await dispatch(calculateCostThunk(payload)).unwrap();
     } catch (error) {
       toast({
-        title: "Error",
-        description: error || "Could not calculate cost. Please try again later.",
+        title: t("calculator.errorTitle"),
+        description: error || t("calculator.errorDesc"),
         variant: "destructive",
       });
     }
@@ -139,10 +140,10 @@ const CalculateCostPage = () => {
           className="text-center mb-10"
         >
           <h1 className="font-display text-3xl md:text-4xl text-foreground font-bold">
-            Estimate Your International Shipping Fee
+            {t("calculator.pageTitle")}
           </h1>
           <p className="mt-2 text-muted-foreground max-w-xl mx-auto">
-            Shop from your SwiftKifisha mailbox abroad and see exactly what delivery to your door costs.
+            {t("calculator.pageSubtitle")}
           </p>
         </motion.div>
 
@@ -152,12 +153,12 @@ const CalculateCostPage = () => {
               <CardHeader>
                 <CardTitle className="font-display flex items-center gap-2">
                   <Calculator className="h-5 w-5 text-primary" />
-                  Shipment Details
+                  {t("calculator.sectionShipment")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Route</Label>
+                  <Label>{t("calculator.labelRoute")}</Label>
                   <div className="grid grid-cols-2 gap-3">
                     <Button
                       type="button"
@@ -165,14 +166,14 @@ const CalculateCostPage = () => {
                       className={isIntl ? "bg-accent text-accent-foreground hover:bg-accent/90" : ""}
                       onClick={() => changeShipmentType("international")}
                     >
-                      <Globe2 className="mr-2 h-4 w-4" /> International
+                      <Globe2 className="mr-2 h-4 w-4" /> {t("calculator.international")}
                     </Button>
                     <Button
                       type="button"
                       variant={!isIntl ? "default" : "outline"}
                       onClick={() => changeShipmentType("national")}
                     >
-                      <Truck className="mr-2 h-4 w-4" /> Domestic (UG)
+                      <Truck className="mr-2 h-4 w-4" /> {t("calculator.domesticUg")}
                     </Button>
                   </div>
                 </div>
@@ -181,9 +182,9 @@ const CalculateCostPage = () => {
                   <>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label>Shipping from (mailbox hub)</Label>
+                        <Label>{t("calculator.labelFromHub")}</Label>
                         <Select value={form.originHub} onValueChange={(v) => setForm({ ...form, originHub: v })}>
-                          <SelectTrigger><SelectValue placeholder="Select hub" /></SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder={t("calculator.placeholderSelectHub")} /></SelectTrigger>
                           <SelectContent>
                             {SHOP_HUB_OPTIONS.map((h) => (
                               <SelectItem key={h.value} value={h.value}>
@@ -194,12 +195,12 @@ const CalculateCostPage = () => {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label>Deliver to (country)</Label>
+                        <Label>{t("calculator.labelToCountry")}</Label>
                         <Select
                           value={form.destinationCountry}
                           onValueChange={(v) => setForm((f) => ({ ...f, destinationCountry: v, destinationCity: "" }))}
                         >
-                          <SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder={t("calculator.placeholderSelectCountry")} /></SelectTrigger>
                           <SelectContent>
                             {COUNTRY_OPTIONS.map((o) => (
                               <SelectItem key={o.country} value={o.country}>{o.country}</SelectItem>
@@ -208,13 +209,13 @@ const CalculateCostPage = () => {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label>City / Region (in destination country)</Label>
+                        <Label>{t("calculator.labelCityRegion")}</Label>
                         <Select
                           value={form.destinationCity}
                           onValueChange={(v) => setForm({ ...form, destinationCity: v })}
                           disabled={!form.destinationCountry}
                         >
-                          <SelectTrigger><SelectValue placeholder={form.destinationCountry ? "Select city / region" : "Choose a country first"} /></SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder={form.destinationCountry ? t("calculator.placeholderCityRegion") : t("calculator.chooseCountryFirst")} /></SelectTrigger>
                           <SelectContent>
                             {placesOf(form.destinationCountry).map((place) => (
                               <SelectItem key={place} value={place}>{place}</SelectItem>
@@ -222,7 +223,7 @@ const CalculateCostPage = () => {
                           </SelectContent>
                         </Select>
                         {form.destinationCountry && placesOf(form.destinationCountry).length === 0 && (
-                          <p className="text-xs text-muted-foreground">No regional list yet for this country.</p>
+                          <p className="text-xs text-muted-foreground">{t("calculator.noRegionList")}</p>
                         )}
                       </div>
                     </div>
@@ -230,24 +231,28 @@ const CalculateCostPage = () => {
                       <Info className="h-3.5 w-3.5 text-accent" />
                       {form.originHub && form.destinationCountry ? (
                         <>
-                          Route: {hubFor(form.originHub)?.city}, {form.originHub} →{" "}
-                          {form.destinationCity ? form.destinationCity + ", " : ""}
-                          {form.destinationCountry}. Fee includes hub pickup and international delivery.
+                          {t("calculator.routeLineIntro", {
+                            origin: `${hubFor(form.originHub)?.city ?? ""}, ${form.originHub}`,
+                            destination: form.destinationCity
+                              ? `${form.destinationCity}, ${form.destinationCountry}`
+                              : form.destinationCountry,
+                          })}
+                          {t("calculator.feeIncludesNote")}
                         </>
                       ) : (
-                        <>Pick your SwiftKifisha mailbox country, then the delivery country and its city / region.</>
+                        <>{t("calculator.pickGuide")}</>
                       )}
                     </p>
                   </>
                 ) : (
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>From (Uganda city / region)</Label>
+                      <Label>{t("calculator.labelFromUganda")}</Label>
                       <Select
                         value={form.originCity}
                         onValueChange={(v) => setForm((f) => ({ ...f, originCity: v, destinationCity: f.destinationCity === v ? "" : f.destinationCity }))}
                       >
-                        <SelectTrigger><SelectValue placeholder="Select city" /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={t("calculator.placeholderSelectCity")} /></SelectTrigger>
                         <SelectContent>
                           {groupedUgandaOptions.map((g) => (
                             <SelectGroup key={g.label}>
@@ -261,9 +266,9 @@ const CalculateCostPage = () => {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>To (Uganda city / region)</Label>
+                      <Label>{t("calculator.labelToUganda")}</Label>
                       <Select value={form.destinationCity} onValueChange={(v) => setForm({ ...form, destinationCity: v })}>
-                        <SelectTrigger><SelectValue placeholder="Select city" /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={t("calculator.placeholderSelectCity")} /></SelectTrigger>
                         <SelectContent>
                           {groupedUgandaOptions.map((g) => {
                             const items = g.items.filter((p) => p.value !== form.originCity);
@@ -285,18 +290,18 @@ const CalculateCostPage = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Parcel Category</Label>
+                    <Label>{t("calculator.labelCategoryField")}</Label>
                     <Select value={form.parcelCategory} onValueChange={(v) => setForm({ ...form, parcelCategory: v })}>
-                      <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t("calculator.placeholderCategory")} /></SelectTrigger>
                       <SelectContent>
                         {categories.map((c) => (
-                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                          <SelectItem key={c.value} value={c.value}>{t(c.labelKey)}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Weight (kg)</Label>
+                    <Label>{t("calculator.labelWeightKg")}</Label>
                     <Input
                       type="number"
                       min={0.1}
@@ -308,19 +313,23 @@ const CalculateCostPage = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Delivery Speed</Label>
+                  <Label>{t("calculator.labelSpeed")}</Label>
                   <Select value={form.deliveryType} onValueChange={(v) => setForm({ ...form, deliveryType: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {deliveryOptions(isIntl).map((d) => (
-                        <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                        <SelectItem key={d.value} value={d.value}>{t(d.labelKey)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
                 <Button onClick={handleCalculate} disabled={loading} className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-semibold">
-                  {loading ? "Calculating..." : isIntl ? "Estimate my shipping fee" : "Calculate Cost"}
+                  {loading
+                    ? t("calculator.btnCalculating")
+                    : isIntl
+                      ? t("calculator.btnEstimateIntl")
+                      : t("calculator.btnEstimateDom")}
                 </Button>
               </CardContent>
             </Card>
@@ -330,60 +339,72 @@ const CalculateCostPage = () => {
             {result ? (
               <Card className="border-border/50 shadow-sm">
                 <CardHeader>
-                  <CardTitle className="font-display">Cost Estimate</CardTitle>
+                  <CardTitle className="font-display">{t("calculator.resultTitle")}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex justify-between py-2 border-b border-border/50">
-                    <span className="text-muted-foreground">Route</span>
+                    <span className="text-muted-foreground">{t("calculator.routeNote")}</span>
                     <span className="font-medium text-foreground capitalize text-right max-w-[60%]">
                       {result.originCity || result.originCountry || "-"} → {result.destinationCity || "-"}
                     </span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-border/50">
-                    <span className="text-muted-foreground">Service</span>
+                    <span className="text-muted-foreground">{t("calculator.quoteService")}</span>
                     <span className="font-medium text-foreground capitalize">
                       {(result.type || "-").replace(/_/g, " ")}
                     </span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-border/50">
-                    <span className="text-muted-foreground">Category</span>
+                    <span className="text-muted-foreground">{t("track.fieldCategory")}</span>
                     <span className="font-medium text-foreground capitalize">
                       {result.parcelCategory?.replace(/_/g, " ") || "-"}
                     </span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-border/50">
-                    <span className="text-muted-foreground">Weight</span>
+                    <span className="text-muted-foreground">{t("track.fieldWeight")}</span>
                     <span className="font-medium text-foreground">{result.weight} kg</span>
                   </div>
                   {result.billableWeight && result.billableWeight !== result.weight && (
                     <div className="flex justify-between py-2 border-b border-border/50">
-                      <span className="text-muted-foreground">Billable weight (min 1 kg)</span>
+                      <span className="text-muted-foreground">{t("calculator.quoteBillable")}</span>
                       <span className="font-medium text-foreground">{result.billableWeight} kg</span>
                     </div>
                   )}
                   {result.distanceKm != null && (
                     <div className="flex justify-between py-2 border-b border-border/50">
-                      <span className="text-muted-foreground">Route distance (approx.)</span>
+                      <span className="text-muted-foreground">{t("calculator.quoteDistance")}</span>
                       <span className="font-medium text-foreground">~{result.distanceKm} km</span>
                     </div>
                   )}
                   {result.breakdown && (
                     <div className="rounded-md bg-muted/50 border border-border/60 px-3 py-2 text-xs space-y-1">
-                      <p className="font-semibold text-muted-foreground">How it is calculated</p>
-                      <p className="flex justify-between"><span>Booking & handling</span><span>UGX {Number(result.breakdown.baseFee).toLocaleString()}</span></p>
-                      <p className="flex justify-between"><span>Content ({result.parcelCategory?.replace(/_/g, " ") || "-"}, {result.billableWeight} kg)</span><span>UGX {Number(result.breakdown.contentFee).toLocaleString()}</span></p>
-                      <p className="flex justify-between"><span>Distance ({result.distanceKm} km)</span><span>UGX {Number(result.breakdown.distanceFee).toLocaleString()}</span></p>
-                      <p className="flex justify-between"><span>Delivery speed x{result.breakdown.deliveryMultiplier}</span><span>{result.breakdown.bulkDiscountApplied ? "bulk 10% off applied" : "no bulk discount"}</span></p>
+                      <p className="font-semibold text-muted-foreground">{t("calculator.breakdownTitle")}</p>
+                      <p className="flex justify-between"><span>{t("calculator.breakdownBooking")}</span><span>UGX {Number(result.breakdown.baseFee).toLocaleString()}</span></p>
+                      <p className="flex justify-between">
+                        <span>
+                          {t("calculator.breakdownContent", {
+                            category: result.parcelCategory?.replace(/_/g, " ") || "-",
+                            weight: `${result.billableWeight ?? result.weight} kg`,
+                          })}
+                        </span>
+                        <span>UGX {Number(result.breakdown.contentFee).toLocaleString()}</span>
+                      </p>
+                      <p className="flex justify-between">
+                        <span>{t("calculator.breakdownDistance", { km: result.distanceKm ?? "-" })}</span>
+                        <span>UGX {Number(result.breakdown.distanceFee).toLocaleString()}</span>
+                      </p>
+                      <p className="flex justify-between">
+                        <span>{t("calculator.breakdownSpeed", { multiplier: result.breakdown.deliveryMultiplier })}</span>
+                        <span>{result.breakdown.bulkDiscountApplied ? t("calculator.breakdownBulkApplied") : t("calculator.breakdownNoBulk")}</span>
+                      </p>
                     </div>
                   )}
                   <div className="flex justify-between py-2">
-                    <span className="text-muted-foreground">Estimated total</span>
+                    <span className="text-muted-foreground">{t("calculator.estimatedTotal")}</span>
                     <span className="font-bold text-lg text-accent">{formatMoney(result.price, result.currency)}</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {result.currency === "USD"
-                      ? "Includes hub pickup and international delivery. Destination duties & taxes are billed at cost with full transparency."
-                      : "Distance-based domestic pricing: booking + content + distance (km). Items under 1 kg are billed as 1 kg. UGX rates apply."}
+                    {result.currency === "USD" ? t("calculator.quoteNoteUsd") : t("calculator.quoteNoteUgx")}
                   </p>
                 </CardContent>
               </Card>
@@ -392,7 +413,7 @@ const CalculateCostPage = () => {
                 <div className="text-center text-muted-foreground">
                   <Calculator className="h-16 w-16 mx-auto mb-4 opacity-20" />
                   <p className="max-w-xs mx-auto">
-                    Estimate the door-to-door cost of shipping from any SwiftKifisha mailbox hub to your country.
+                    {t("calculator.emptyHint")}
                   </p>
                 </div>
               </div>

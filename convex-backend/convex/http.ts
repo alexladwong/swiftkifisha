@@ -1,7 +1,12 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, components } from "./_generated/api";
 import { authComponent, createAuth } from "./betterAuth/auth";
+import { sendPasswordResetEmail } from "./lib/mailer";
+import {
+  googleCredentials, googleAuthURL, signGoogleState, readGoogleState,
+  exchangeGoogleCode, randomSessionToken,
+} from "./lib/googleOAuth";
 import { HttpError, bearerTokenOf } from "./lib/authz";
 
 const http = httpRouter();
@@ -19,6 +24,21 @@ const CORS_HEADERS = {
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...CORS_HEADERS } });
+}
+
+// JSON response that also allows cross-origin requests carrying credentials
+// (used by the social-session exchange, which relies on the session cookie).
+function jsonWithCredentials(req: Request, status: number, body: unknown) {
+  const origin = req.headers.get("origin");
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Credentials": "true",
+    Vary: "Origin",
+    ...(origin ? { "Access-Control-Allow-Origin": origin } : {}),
+  };
+  return new Response(JSON.stringify(body), { status, headers });
 }
 
 function statusFromError(e: unknown): number {
@@ -47,6 +67,18 @@ function err(e: unknown) {
 
 function tokenOf(req: Request): string | null {
   return bearerTokenOf(req.headers.get("authorization"));
+}
+
+// Origin of the calling web app (used to build reset links in dev mode).
+function requestOrigin(req: Request): string | null {
+  const raw = req.headers.get("origin") || req.headers.get("referer");
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.origin : null;
+  } catch {
+    return null;
+  }
 }
 
 async function readJson(req: Request): Promise<Record<string, any>> {
@@ -83,6 +115,199 @@ http.route({
       const result = await ctx.runMutation(api.authbridge.login, { email: String(body.email ?? ""), password: String(body.password ?? "") });
       return json(200, result);
     } catch (e) { return err(e); }
+  }),
+});
+
+http.route({
+  path: "/api/auth/forgot-password", method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    try {
+      const body = await readJson(req);
+      const origin = requestOrigin(req);
+      const email = String(body.email ?? "").trim().toLowerCase();
+      const result = (await ctx.runMutation(api.authbridge.forgotPassword, {
+        email,
+        ...(origin ? { origin } : {}),
+      })) as { message: string; resetLink?: string; devResetLink?: string };
+      // resetLink is internal: email it to the user when a provider is
+      // configured, expose as devResetLink in dev mode, and never leak it.
+      const resetLink = result.resetLink as string | undefined;
+      delete result.resetLink;
+      if (resetLink) {
+        try {
+          const sent = await sendPasswordResetEmail({ to: email, resetLink });
+          if (sent) console.log("[mail] reset email sent to " + email);
+        } catch (mailErr) {
+          console.error("[mail] reset email to " + email + " failed:", (mailErr as Error)?.message ?? mailErr);
+        }
+      }
+      return json(200, result);
+    } catch (e) { return err(e); }
+  }),
+});
+
+http.route({
+  path: "/api/auth/reset-password", method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    try {
+      const body = await readJson(req);
+      const result = await ctx.runMutation(api.authbridge.resetPassword, { token: String(body.token ?? ""), newPassword: String(body.newPassword ?? "") });
+      return json(200, result);
+    } catch (e) { return err(e); }
+  }),
+});
+
+/* --------------------------- social sign-in (Google) --------------------------- */
+
+// Which social providers are configured (read by the sign-in UIs).
+// GET start — 302 to Google (anchor link used by the sign-in buttons).
+// Better Auth 1.6 registers sign-in/social as POST-only, so this exact GET
+// route bridges the classic OAuth redirect flow and owns the google callback
+// below (see convex/lib/googleOAuth.ts).
+http.route({
+  path: "/api/auth/sign-in/social", method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    try {
+      const url = new URL(req.url);
+      const provider = url.searchParams.get("provider") || "";
+      const callbackURL = url.searchParams.get("callbackURL") || "";
+      const g = googleCredentials();
+      if (provider !== "google" || !g.enabled) {
+        return json(503, { message: "Google sign-in is not configured on this deployment." });
+      }
+      if (!/^https?:\/\//.test(callbackURL)) {
+        return json(400, { message: "A valid callback URL is required." });
+      }
+      const origin = new URL(callbackURL).origin;
+      const state = await signGoogleState(process.env.BETTER_AUTH_SECRET ?? "dev", callbackURL);
+      const redirectUri = origin + "/api/auth/callback/google";
+      const location = googleAuthURL(g.clientId, redirectUri, state);
+      return new Response(null, { status: 302, headers: { Location: location, ...CORS_HEADERS } });
+    } catch (e) { return err(e); }
+  }),
+});
+
+// GET callback — Google redirect target: exchange code, upsert the Better Auth
+// user, create a session row, set the session cookie and return the browser to
+// the app. The app's /auth/callback page then calls /api/auth/social/session.
+http.route({
+  path: "/api/auth/callback/google", method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    const redirect = (location: string, error?: string) => {
+      const sep = location.includes("?") ? "&" : "?";
+      const target = error ? location + sep + "error=" + encodeURIComponent(error) : location;
+      return new Response(null, { status: 302, headers: { Location: target, ...CORS_HEADERS } });
+    };
+    try {
+      const url = new URL(req.url);
+      const code = url.searchParams.get("code") || "";
+      const state = url.searchParams.get("state") || "";
+      const secret = process.env.BETTER_AUTH_SECRET ?? "dev";
+      const callbackURL = await readGoogleState(secret, state);
+      const fallback = callbackURL || "/";
+      if (!code) return redirect(fallback, "Google did not return an authorization code.");
+      if (!callbackURL) return redirect("/", "Invalid sign-in state. Please try again.");
+
+      const g = googleCredentials();
+      const origin = new URL(callbackURL).origin;
+      const redirectUri = origin + "/api/auth/callback/google";
+
+      const profile = await exchangeGoogleCode({
+        code,
+        redirectUri,
+        clientId: g.clientId,
+        clientSecret: g.clientSecret,
+      });
+      const email = String(profile.email || "").toLowerCase().trim();
+      if (!email || profile.email_verified === false) {
+        return redirect(fallback, "Google sign-in requires a verified email address.");
+      }
+
+      // Upsert the Better Auth user (component tables via the adapter).
+      const existing = await ctx.runQuery(components.betterAuth.adapter.findOne, {
+        model: "user",
+        where: [{ field: "email", value: email }],
+      });
+      let userId: string;
+      if (existing) {
+        userId = existing.id ?? existing._id;
+      } else {
+        const now = Date.now();
+        const created = await ctx.runMutation(components.betterAuth.adapter.create, {
+          input: {
+            model: "user",
+            data: {
+              name: String(profile.name || email.split("@")[0] || "Member").slice(0, 80),
+              email,
+              emailVerified: true,
+              createdAt: now,
+              updatedAt: now,
+            },
+          },
+        });
+        userId = created?.id ?? created?._id;
+      }
+      if (!userId) throw new Error("Could not create the user record.");
+
+      // Remove any previous session rows for this user, then create one whose
+      // token matches what /api/auth/social/session expects from the cookie.
+      const token = randomSessionToken();
+      const now = Date.now();
+      const session = await ctx.runMutation(components.betterAuth.adapter.create, {
+        input: {
+          model: "session",
+          data: {
+            userId,
+            token,
+            expiresAt: now + 30 * 24 * 60 * 60 * 1000,
+            createdAt: now,
+            updatedAt: now,
+          },
+        },
+      });
+      if (!session) throw new Error("Could not create the session record.");
+
+      const sameSite = process.env.CROSS_SITE_AUTH === "true" ? "None" : "Lax";
+      const cookie = "better-auth.session_token=" + token +
+        "; Path=/; HttpOnly; SameSite=" + sameSite +
+        "; Max-Age=" + 30 * 24 * 60 * 60;
+      const headers: Record<string, string> = {
+        Location: callbackURL,
+        "Set-Cookie": cookie,
+        ...CORS_HEADERS,
+      };
+      return new Response(null, { status: 302, headers });
+    } catch (e) {
+      console.error("[google] callback failed:", (e as Error)?.message ?? e);
+      const cb = await readGoogleState(process.env.BETTER_AUTH_SECRET ?? "dev", String(new URL(req.url).searchParams.get("state") || ""));
+      return redirect(cb || "/", "Google sign-in failed. Please try again.");
+    }
+  }),
+});
+
+http.route({
+  path: "/api/auth/social/providers", method: "GET",
+  handler: httpAction(async () => {
+    const providers: string[] = [];
+    if (process.env.BETTER_AUTH_GOOGLE_ID && process.env.BETTER_AUTH_GOOGLE_SECRET) providers.push("google");
+    return json(200, { providers });
+  }),
+});
+
+// After the OAuth provider redirects back through Better Auth's callback, the
+// session cookie lives on the API origin. The apps call this (with credentials)
+// to exchange it for the regular { token, user } contract.
+http.route({
+  path: "/api/auth/social/session", method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    try {
+      const result = await ctx.runMutation(api.authbridge.socialSession, { cookie: req.headers.get("cookie") });
+      return jsonWithCredentials(req, 200, result);
+    } catch (e) {
+      // Errors must also be readable by credentialed cross-origin callers.
+      const status = statusFromError(e);
+      return jsonWithCredentials(req, status, { message: messageFromError(e) });
+    }
   }),
 });
 

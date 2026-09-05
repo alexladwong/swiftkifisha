@@ -24,6 +24,16 @@ export default defineSchema({
     .index("by_email", ["email"])
     .index("by_memberCode", ["memberCode"]),
 
+  // One-time password-reset tokens (email + opaque token, 60 min TTL).
+  resetTokens: defineTable({
+    email: v.string(),
+    token: v.string(),
+    expiresAt: v.string(),
+    createdAt: v.string(),
+  })
+    .index("by_token", ["token"])
+    .index("by_email", ["email"]),
+
   parcels: defineTable({
     trackingId: v.string(),
     senderName: v.string(),

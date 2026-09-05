@@ -14,7 +14,9 @@ import type * as authbridge from "../authbridge.js";
 import type * as http from "../http.js";
 import type * as lib_agg from "../lib/agg.js";
 import type * as lib_authz from "../lib/authz.js";
+import type * as lib_googleOAuth from "../lib/googleOAuth.js";
 import type * as lib_intl from "../lib/intl.js";
+import type * as lib_mailer from "../lib/mailer.js";
 import type * as lib_pricing from "../lib/pricing.js";
 import type * as lib_pricingFx from "../lib/pricingFx.js";
 import type * as lib_types from "../lib/types.js";
@@ -23,6 +25,7 @@ import type * as parcels from "../parcels.js";
 import type * as seed from "../seed.js";
 import type * as shop from "../shop.js";
 import type * as stats from "../stats.js";
+import type * as sync from "../sync.js";
 
 import type {
   ApiFromModules,
@@ -37,7 +40,9 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   "lib/agg": typeof lib_agg;
   "lib/authz": typeof lib_authz;
+  "lib/googleOAuth": typeof lib_googleOAuth;
   "lib/intl": typeof lib_intl;
+  "lib/mailer": typeof lib_mailer;
   "lib/pricing": typeof lib_pricing;
   "lib/pricingFx": typeof lib_pricingFx;
   "lib/types": typeof lib_types;
@@ -46,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   seed: typeof seed;
   shop: typeof shop;
   stats: typeof stats;
+  sync: typeof sync;
 }>;
 
 /**

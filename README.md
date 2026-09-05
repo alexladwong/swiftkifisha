@@ -24,6 +24,16 @@ there, and SwiftKifisha consolidates and delivers to their door in 50+ countries
 - **Demo data** (auto-seeded): 2 admins, 26 members and 200 parcels spanning
   domestic and international member shipments across the last 6 months.
 
+- **International (i18n)**: the customer site speaks English, Spanish, French,
+  Arabic (RTL) and Simplified Chinese — pick a language from the header/footer
+  switcher (persisted; default follows the browser). Copy lives in
+  `frontend/src/i18n/{en,es,fr,ar,zh}.js`; `node scripts/check-i18n.cjs`
+  verifies every language mirrors English key-for-key.
+- **Auth**: email+password sign-up/sign-in, forgot/reset password pages
+  (`/forgot-password`, `/reset-password` on both apps), and Google + LinkedIn
+  social sign-in through Better Auth (credential setup in
+  `convex-backend/README.md`).
+
 The two web apps proxy every `/api` request to the backend
 (`vite.config.js` — override with the `API_PROXY` env var if you move the API).
 

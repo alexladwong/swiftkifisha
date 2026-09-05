@@ -7,12 +7,29 @@ const getErrorMessage = (error) =>
 
 const LOGIN_PATH = import.meta.env.VITE_AUTH_LOGIN_PATH || "/auth/login";
 const ADD_USER_PATH = import.meta.env.VITE_AUTH_ADD_USER_PATH || "/auth/add-user";
+const ADMIN_OTP_VERIFY_PATH = import.meta.env.VITE_AUTH_OTP_VERIFY_PATH || "/auth/admin/otp/verify";
 
 export const loginThunk = createAsyncThunk(
   "auth/login",
   async (payload, thunkAPI) => {
     try {
       const { data } = await axiosInstance.post(LOGIN_PATH, payload);
+      localStorage.setItem("token", data.token);
+      toast.success("Logged In");
+      return data;
+    } catch (error) {
+      const message = getErrorMessage(error);
+      toast.error(message);
+      return thunkAPI.rejectWithValue(message);
+    }
+  },
+);
+
+export const adminOtpVerifyThunk = createAsyncThunk(
+  "auth/otpVerify",
+  async ({ email, code }, thunkAPI) => {
+    try {
+      const { data } = await axiosInstance.post(ADMIN_OTP_VERIFY_PATH, { email, code });
       localStorage.setItem("token", data.token);
       toast.success("Logged In");
       return data;
@@ -71,6 +88,19 @@ const authSlice = createSlice({
       .addCase(loginThunk.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || "Login Failed";
+      })
+      .addCase(adminOtpVerifyThunk.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(adminOtpVerifyThunk.fulfilled, (state, action) => {
+        state.loading = false;
+        state.token = action.payload?.token || null;
+        state.user = action.payload?.user || null;
+      })
+      .addCase(adminOtpVerifyThunk.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "Sign-in failed";
       });
   },
 });

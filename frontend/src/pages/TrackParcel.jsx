@@ -10,6 +10,14 @@ import { useToast } from "@/hooks/use-toast";
 import TrackingTimeline from "@/components/TrackingTimeline";
 import { useDispatch, useSelector } from "react-redux";
 import { trackParcelThunk } from "@/features/parcels/parcelSlice";
+import { useI18n } from "@/i18n";
+
+const STATUS_KEYS = {
+  arrived: "track.statusArrived",
+  in_transit: "track.statusInTransit",
+  out_for_delivery: "track.statusOutForDelivery",
+  delivered: "track.statusDelivered",
+};
 
 const statusColors = {
   arrived: "bg-muted text-muted-foreground",
@@ -19,6 +27,7 @@ const statusColors = {
 };
 
 const TrackParcel = () => {
+  const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const [trackingId, setTrackingId] = useState(searchParams.get("id") || "");
   const dispatch = useDispatch();
@@ -37,9 +46,9 @@ const TrackParcel = () => {
       await dispatch(trackParcelThunk(trackingId.trim())).unwrap();
     } catch (error) {
       toast({
-        title: "Parcel not found",
-        description: "Please check your tracking ID and try again.",
-        variant: "desctructive",
+        title: t("track.toastTitle"),
+        description: t("track.toastDesc"),
+        variant: "destructive",
       });
     }
   };
@@ -48,12 +57,26 @@ const TrackParcel = () => {
     if (searchParams.get("id")) {
       handleTrack();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const currentStatus =
     parcel?.checkpoints?.length > 0
       ? parcel.checkpoints[parcel.checkpoints.length - 1].status
       : "arrived";
+
+  const statusLabel = (status) => t(STATUS_KEYS[status] || "track.statusArrived");
+
+  const detailRows = (p) => [
+    [t("track.fieldTrackingId"), p.trackingID],
+    [t("track.fieldShipmentType"), p.shimpentType],
+    [t("track.fieldDeliveryType"), p.deliveryType],
+    [t("track.fieldCategory"), p.parcelCategory],
+    [t("track.fieldWeight"), `${p.Weight} kg`],
+    [t("track.fieldOrigin"), p.originCity],
+    [t("track.fieldDestination"), p.destinationCity],
+    [t("track.fieldStatus"), statusLabel(currentStatus)],
+  ];
 
   return (
     <>
@@ -65,10 +88,10 @@ const TrackParcel = () => {
             className="text-center mb-10"
           >
             <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground">
-              Track Your Parcel
+              {t("track.pageTitle")}
             </h1>
             <p className="text-muted-foreground mt-2">
-              Enter your tracking ID to see live updates
+              {t("track.pageSubtitle")}
             </p>
           </motion.div>
 
@@ -79,7 +102,7 @@ const TrackParcel = () => {
             className="max-w-lg mx-auto flex gap-2 mb-12"
           >
             <Input
-              placeholder="Enter Tracking ID (e.g. UG-CRR-123456)"
+              placeholder={t("track.placeholder")}
               value={trackingId}
               onChange={(e) => setTrackingId(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleTrack()}
@@ -91,7 +114,7 @@ const TrackParcel = () => {
               className="bg-primary text-primary-foreground shrink-0"
             >
               <Search className="mr-2 h-4 w-4" />
-              Track
+              {t("track.btnTrack")}
             </Button>
           </motion.div>
 
@@ -113,12 +136,11 @@ const TrackParcel = () => {
               </div>
 
               <h3 className="font-display font-semibold text-lg text-foreground">
-                Parcel Not Found
+                {t("track.notFoundTitle")}
               </h3>
 
               <p className="text-sm text-muted-foreground mt-2">
-                We couldn't find a parcel with that tracking ID. Please
-                double-check and try again.
+                {t("track.notFoundDesc")}
               </p>
             </motion.div>
           )}
@@ -134,29 +156,20 @@ const TrackParcel = () => {
                   <div className="flex items-center justify-between">
                     <CardTitle className="font-display flex items-center gap-2">
                       <Package className="h-5 w-5 text-primary" />
-                      Parcel Details
+                      {t("track.detailsTitle")}
                     </CardTitle>
 
                     <span
                       className={`rounded-full px-3 py-1 text-xs font-medium ${statusColors[currentStatus] || ""}`}
                     >
-                      {currentStatus.replace(/_/g, " ")}
+                      {statusLabel(currentStatus)}
                     </span>
                   </div>
                 </CardHeader>
 
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4 text-sm">
-                    {[
-                      ["Tracking ID", parcel.trackingID],
-                      ["Shipment Type", parcel.shimpentType],
-                      ["Delivery Type", parcel.deliveryType],
-                      ["Category", parcel.parcelCategory],
-                      ["Weight", `${parcel.Weight} kg`],
-                      ["Origin", parcel.originCity],
-                      ["Destination", parcel.destinationCity],
-                      ["Status", currentStatus.replace(/_/g, " ")],
-                    ].map(([label, value]) => (
+                    {detailRows(parcel).map(([label, value]) => (
                       <div key={label}>
                         <span className="text-muted-foreground">{label}</span>
                         <p className="font-medium text-foreground capitalize">
@@ -170,7 +183,7 @@ const TrackParcel = () => {
 
               <div>
                 <h3 className="font-display text-xl font-semibold text-foreground mb-6">
-                  Tracking Timeline
+                  {t("track.timelineTitle")}
                 </h3>
                 <TrackingTimeline checkpoints={parcel.checkpoints} />
               </div>

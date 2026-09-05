@@ -149,8 +149,8 @@ export default function PortalShell() {
         </main>
       </div>
 
-      {/* Mobile account drawer (left side) */}
-      <SideDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} side="left" widthClass="w-[min(330px,92vw)]" label="Account menu">
+      {/* Mobile account drawer */}
+      <SideDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} label="Account menu">
         <div className="flex h-full flex-col">
           <SidebarContent onNavigate={() => setDrawerOpen(false)} />
           <button
