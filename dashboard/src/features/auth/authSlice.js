@@ -15,6 +15,7 @@ export const loginThunk = createAsyncThunk(
     try {
       const { data } = await axiosInstance.post(LOGIN_PATH, payload);
       localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user || null));
       toast.success("Logged In");
       return data;
     } catch (error) {
@@ -31,6 +32,7 @@ export const adminOtpVerifyThunk = createAsyncThunk(
     try {
       const { data } = await axiosInstance.post(ADMIN_OTP_VERIFY_PATH, { email, code });
       localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user || null));
       toast.success("Logged In");
       return data;
     } catch (error) {
@@ -56,9 +58,17 @@ export const addUserThunk = createAsyncThunk(
   },
 );
 
+const storedUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem("user") || "null");
+  } catch {
+    return null;
+  }
+};
+
 const initialState = {
   token: localStorage.getItem("token") || null,
-  user: null,
+  user: storedUser(),
   loading: false,
   error: null,
 };
@@ -69,6 +79,7 @@ const authSlice = createSlice({
   reducers: {
     logout: (state) => {
       localStorage.removeItem("token");
+      localStorage.removeItem("user");
       state.token = null;
       state.user = null;
       state.error = null;

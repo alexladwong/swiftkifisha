@@ -16,6 +16,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Analytics from "./pages/Analytics";
 import AddAdmin from "@/pages/AddAdmin";
 import Members from "@/pages/Members";
+import SecurityPage from "@/pages/Security";
 
 const App = () => (
   <TooltipProvider>
@@ -37,6 +38,7 @@ const App = () => (
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/add-admin" element={<AddAdmin />} />
             <Route path="/members" element={<Members />} />
+            <Route path="/security" element={<SecurityPage />} />
           </Route>
         </Route>
 

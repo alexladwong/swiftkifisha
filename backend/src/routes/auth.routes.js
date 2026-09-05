@@ -466,6 +466,11 @@ router.post("/change-password", requireAuth, ah(async (req, res) => {
   const { currentPassword, newPassword } = req.body || {};
   const user = db.data.users.find((u) => u._id === req.user._id);
   if (!user) return res.status(401).json({ message: "Account not found." });
+  if (!user.passwordHash) {
+    return res.status(400).json({
+      message: "This admin has no password set — sign in with your email code instead.",
+    });
+  }
   if (!currentPassword || !(await bcrypt.compare(String(currentPassword), user.passwordHash))) {
     return res.status(400).json({ message: "Current password is incorrect." });
   }

@@ -7,6 +7,7 @@ import {
   BarChart3,
   UserPlus,
   Users,
+  ShieldCheck,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
@@ -32,6 +33,7 @@ const mainItems = [
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Parcel Tracking", url: "/tracking", icon: Search },
   { title: "Add Admin", url: "/add-admin", icon: UserPlus },
+  { title: "Security", url: "/security", icon: ShieldCheck },
 ];
 export function AppSidebar() {
   const { state } = useSidebar();

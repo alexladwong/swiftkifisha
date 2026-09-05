@@ -214,7 +214,7 @@ export default function SideDrawer({
           "bg-white",
           "shadow-[-18px_0_50px_-25px_rgba(15,23,42,0.35)]",
           "transition-transform duration-300",
-          "ease-[cubic-bezier(0.4,0,0.2,1)]",
+          "ease-in-out",
           open
             ? "translate-x-0"
             : "translate-x-full",

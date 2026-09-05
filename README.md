@@ -56,6 +56,9 @@ Templates: `frontend/.env.example`, `dashboard/.env.example`.
 > Uganda, UGX -> UGX). If copy or identifiers look wrong, run:
 > `node scripts/restore-brand-tokens.cjs`
 
+> **Going live?** Read [`DEPLOY.md`](DEPLOY.md) first — deployment checklist,
+> secrets handling, Google OAuth URIs and `/api` proxying.
+
 ## Quick start
 
 ```sh

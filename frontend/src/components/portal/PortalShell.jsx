@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import SideDrawer from "@/components/layout/SideDrawer";
+import AuthDialog from "@/components/AuthDialog";
 import { logout } from "@/features/auth/authSlice";
 
 const NAV = [
@@ -78,22 +79,52 @@ export default function PortalShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState("signin");
 
   useEffect(() => {
     setDrawerOpen(false);
   }, [location.pathname]);
 
+  // Auth gate: /account/* stays CLOSED until an authenticated member exists.
+  // Sign in (email/OTP/Google) or sign up right here; the portal opens
+  // automatically once Redux carries token + user — no reload needed.
   if (!token || !user) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
-        <Package className="h-10 w-10 text-slate-300" />
-        <div>
-          <p className="font-display text-xl font-bold text-foreground">Sign in to open your portal</p>
-          <p className="mt-1 text-sm text-muted-foreground">Your mailboxes, shipments and settings live here.</p>
+      <div className="flex min-h-[70vh] flex-col items-center justify-center gap-5 px-6 py-16 text-center">
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-soft text-primary">
+          <Package className="h-7 w-7" strokeWidth={1.9} />
+        </span>
+        <div className="max-w-md">
+          <p className="font-display text-2xl font-bold text-foreground">Sign in to open your portal</p>
+          <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">
+            Your mailboxes, shipments and settings live behind this page. Sign in to continue —
+            or create a free account to get your US and UK mailbox addresses instantly.
+          </p>
         </div>
-        <Link to="/" className="rounded-lg bg-accent px-5 py-2.5 text-sm font-bold text-white hover:bg-accent/90">
-          Back to SwiftKifisha
-        </Link>
+        <div className="flex flex-col gap-2.5 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => { setAuthMode("signin"); setAuthOpen(true); }}
+            className="h-11 rounded-[10px] bg-accent px-7 text-[15px] font-bold text-accent-foreground shadow-sm transition hover:bg-accent/90"
+          >
+            Sign in
+          </button>
+          <button
+            type="button"
+            onClick={() => { setAuthMode("signup"); setAuthOpen(true); }}
+            className="h-11 rounded-[10px] border border-border bg-white px-7 text-[15px] font-semibold text-foreground transition hover:bg-surface"
+          >
+            Create free account
+          </button>
+          <Link
+            to="/"
+            className="inline-flex h-11 items-center justify-center rounded-[10px] px-4 text-sm font-semibold text-muted-foreground transition hover:text-foreground"
+          >
+            Back to SwiftKifisha
+          </Link>
+        </div>
+        <AuthDialog open={authOpen} onOpenChange={setAuthOpen} initialMode={authMode} />
       </div>
     );
   }
