@@ -17,6 +17,7 @@ import Analytics from "./pages/Analytics";
 import AddAdmin from "@/pages/AddAdmin";
 import Members from "@/pages/Members";
 import SecurityPage from "@/pages/Security";
+import ProfilePage from "@/pages/Profile";
 
 const App = () => (
   <TooltipProvider>
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/add-admin" element={<AddAdmin />} />
             <Route path="/members" element={<Members />} />
             <Route path="/security" element={<SecurityPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
           </Route>
         </Route>
 

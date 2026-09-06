@@ -28,6 +28,50 @@ function withMemberProfile(user) {
   };
 }
 
+/**
+ * GET /api/auth/me — the signed-in admin's own account (+ session info).
+ * PATCH /api/auth/me { name } — update the admin's display name.
+ */
+function bearerOf(req) {
+  const header = req.headers.authorization || "";
+  const m = /^Bearer\s+(.+)$/i.exec(header.trim());
+  return m ? m[1] : null;
+}
+
+router.get("/me", requireAuth, ah(async (req, res) => {
+  const user = db.data.users.find((u) => u._id === req.user._id);
+  if (!user) return res.status(401).json({ message: "Account not found." });
+  let sessionExp = null;
+  let issuedAt = null;
+  try {
+    const payload = jwt.verify(bearerOf(req), config.jwtSecret);
+    sessionExp = payload.exp ? new Date(payload.exp * 1000).toISOString() : null;
+    issuedAt = payload.iat ? new Date(payload.iat * 1000).toISOString() : null;
+  } catch {
+    /* token already validated by requireAuth */
+  }
+  return res.json({
+    user: {
+      ...publicUser(user),
+      passwordSet: Boolean(user.passwordHash),
+      sessionExp,
+      issuedAt,
+    },
+  });
+}));
+
+router.patch("/me", requireAuth, ah(async (req, res) => {
+  const user = db.data.users.find((u) => u._id === req.user._id);
+  if (!user) return res.status(401).json({ message: "Account not found." });
+  const name = String((req.body || {}).name || "").trim();
+  if (!name || name.length > 80) {
+    return res.status(400).json({ message: "Name is required (max 80 characters)." });
+  }
+  user.name = name;
+  db.persist();
+  return res.json({ message: "Profile updated", user: { ...publicUser(user), passwordSet: Boolean(user.passwordHash) } });
+}));
+
 /** POST /api/auth/login  { email, password } -> { token, user } */
 router.post("/login", ah(async (req, res) => {
   const { email, password } = req.body || {};
@@ -164,9 +208,28 @@ router.post("/admin/dev-login", ah(async (req, res) => {
   if (!equal) {
     return res.status(401).json({ message: "Invalid developer credentials." });
   }
-  const admin = db.data.users.find((u) => u.email === devEmail && u.role === "admin");
+  // The dev admin should exist in the connected store. If the remote dataset
+  // was replaced (e.g. Neon restores/branch switches), provision it on the
+  // fly — dev only; this route is a 404 before this point in production.
+  let admin = db.data.users.find((u) => u.email === devEmail && u.role === "admin");
   if (!admin) {
-    return res.status(401).json({ message: "Invalid developer credentials." });
+    const existing = db.data.users.find((u) => u.email === devEmail);
+    if (existing) {
+      existing.role = "admin";
+      admin = existing;
+    } else {
+      admin = {
+        _id: objectId(),
+        name: process.env.DEV_ADMIN_NAME || "Local Dev Admin",
+        email: devEmail,
+        passwordHash: null,
+        role: "admin",
+        createdAt: new Date().toISOString(),
+      };
+      db.data.users.push(admin);
+    }
+    db.persist();
+    console.log(`[dev-login] provisioned dev admin ${devEmail} in the local store.`);
   }
   const token = jwt.sign(
     { sub: admin._id, role: admin.role, name: admin.name, email: admin.email },
@@ -174,6 +237,41 @@ router.post("/admin/dev-login", ah(async (req, res) => {
     { expiresIn: config.jwtExpiresIn },
   );
   return res.json({ message: "Logged in successfully", token, user: publicUser(admin) });
+}));
+
+/**
+ * POST /api/auth/admin/email/test (admin session) — sends a real OTP email to
+ * the signed-in admin's own inbox so email delivery can be verified instantly.
+ */
+router.post("/admin/email/test", requireAuth, ah(async (req, res) => {
+  const user = db.data.users.find((u) => u._id === req.user._id);
+  if (!user) return res.status(401).json({ message: "Account not found." });
+  const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+  try {
+    await sendOtpEmail({ to: user.email, code });
+    return res.json({ message: "Test email queued", to: user.email });
+  } catch (err) {
+    console.error(`[mail] test email to ${user.email} failed:`, err?.message ?? err);
+    return res.status(502).json({ message: `Email failed: ${err?.message ?? "unknown error"}` });
+  }
+}));
+
+/**
+ * POST /api/auth/admins/promote { email } — super-admin only.
+ * Promotes an existing user (e.g. a member created via social sign-up) to the
+ * admin role so they can use email-OTP admin sign-in. Idempotent.
+ */
+router.post("/admins/promote", requireAuth, ah(async (req, res) => {
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ message: "Admin access required." });
+  }
+  const email = String((req.body || {}).email || "").toLowerCase().trim();
+  const user = email ? db.data.users.find((u) => u.email === email) : null;
+  if (!user) return res.status(404).json({ message: "No account found with that email." });
+  if (user.role === "admin") return res.json({ message: "Already an admin", user: publicUser(user) });
+  user.role = "admin";
+  db.persist();
+  return res.json({ message: "Promoted to admin", user: publicUser(user) });
 }));
 
 /* --------------------- Admin email-OTP sign-in (no password) --------------------- */
@@ -223,7 +321,9 @@ router.post("/admin/otp/request", ah(async (req, res) => {
       attempts: 0,
       lastSentAt: new Date().toISOString(),
     });
-    if (config.isDev) console.log(`[otp] admin sign-in code for ${email}: ${code}`);
+    if (config.isDev || process.env.LOG_OTP_CODES === "true") {
+      console.log(`[otp] admin sign-in code for ${email}: ${code}`);
+    }
     sendOtpEmail({ to: email, code }).catch((e) =>
       console.error(`[mail] OTP email to ${email} failed:`, e?.message ?? e));
     return res.json({
@@ -500,20 +600,22 @@ router.post("/change-password", requireAuth, ah(async (req, res) => {
   const { currentPassword, newPassword } = req.body || {};
   const user = db.data.users.find((u) => u._id === req.user._id);
   if (!user) return res.status(401).json({ message: "Account not found." });
-  if (!user.passwordHash) {
-    return res.status(400).json({
-      message: "This admin has no password set — sign in with your email code instead.",
-    });
-  }
-  if (!currentPassword || !(await bcrypt.compare(String(currentPassword), user.passwordHash))) {
-    return res.status(400).json({ message: "Current password is incorrect." });
-  }
   if (!newPassword || String(newPassword).length < 8) {
     return res.status(400).json({ message: "New password must be at least 8 characters." });
   }
+  const hadPassword = Boolean(user.passwordHash);
+  if (hadPassword) {
+    if (!currentPassword || !(await bcrypt.compare(String(currentPassword), user.passwordHash))) {
+      return res.status(400).json({ message: "Current password is incorrect." });
+    }
+  }
   user.passwordHash = await bcrypt.hash(String(newPassword), config.bcryptRounds ?? 10);
   db.persist();
-  return res.json({ message: "Password changed successfully" });
+  return res.json({
+    message: hadPassword
+      ? "Password changed successfully"
+      : "Password created successfully — you can still sign in with email codes.",
+  });
 }));
 
 export default router;

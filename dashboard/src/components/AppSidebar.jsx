@@ -8,6 +8,7 @@ import {
   UserPlus,
   Users,
   ShieldCheck,
+  UserRound,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
@@ -33,6 +34,7 @@ const mainItems = [
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Parcel Tracking", url: "/tracking", icon: Search },
   { title: "Add Admin", url: "/add-admin", icon: UserPlus },
+  { title: "Profile", url: "/profile", icon: UserRound },
   { title: "Security", url: "/security", icon: ShieldCheck },
 ];
 export function AppSidebar() {

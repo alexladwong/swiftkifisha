@@ -12,7 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PackagePlus } from "lucide-react";
+import { PackagePlus, CheckCircle2, X } from "lucide-react";
+import ParcelQR from "@/components/ParcelQR";
 import { createParcelThunk } from "@/features/parcels/parcelSlice";
 import { toast } from "sonner";
 import {
@@ -59,6 +60,8 @@ export default function CreateParcel() {
     [form.shipmentType],
   );
 
+  const [createdParcel, setCreatedParcel] = useState(null);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -88,6 +91,7 @@ export default function CreateParcel() {
 
     const res = await dispatch(createParcelThunk(payload));
     if (createParcelThunk.fulfilled.match(res)) {
+      setCreatedParcel(res.payload || null);
       setForm({
         senderName: "",
         senderPhone: "",
@@ -122,6 +126,33 @@ export default function CreateParcel() {
             </p>
           </div>
         </div>
+
+        {createdParcel?.trackingId && (
+          <div className="flex flex-col gap-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                <CheckCircle2 className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="font-semibold text-emerald-900">Parcel created: {createdParcel.trackingId}</p>
+                <p className="text-sm text-emerald-800/80">
+                  Share the QR code with the member — they can also download it from their dashboard.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <ParcelQR trackingId={createdParcel.trackingId} />
+              <button
+                type="button"
+                onClick={() => setCreatedParcel(null)}
+                aria-label="Dismiss"
+                className="self-start rounded-lg p-1.5 text-emerald-800/60 transition hover:bg-emerald-100 hover:text-emerald-900"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <Card className="border-0 shadow-md">

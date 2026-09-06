@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Outlet } from "react-router-dom";
-import { ChevronDown, KeyRound, LogOut } from "lucide-react";
+import { ChevronDown, KeyRound, LogOut, UserRound } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -64,8 +64,13 @@ export function DashboardLayout() {
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
+                      <Link to="/profile" className="cursor-pointer">
+                        <UserRound className="mr-2 h-4 w-4" /> My Profile
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
                       <Link to="/security" className="cursor-pointer">
-                        <KeyRound className="mr-2 h-4 w-4" /> Change password
+                        <KeyRound className="mr-2 h-4 w-4" /> Security
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive">

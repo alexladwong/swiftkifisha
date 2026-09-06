@@ -5,6 +5,7 @@ import { Package, Globe2, Wallet, Clock3, MapPin, ArrowRight } from "lucide-reac
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import CopyButton from "@/components/portal/CopyButton";
+import ParcelQR from "@/components/ParcelQR";
 import { fetchMyParcels } from "@/lib/portalApi";
 
 const statusOf = (p) => {
@@ -146,9 +147,10 @@ export default function Overview() {
                 {parcels.data.map((p) => (
                   <tr key={p._id} className="border-b border-border/50 last:border-0 hover:bg-surface/40">
                     <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <span className="font-mono text-[13px] font-medium">{p.trackingId}</span>
                         <CopyButton value={p.trackingId} label="Copy" />
+                        <ParcelQR trackingId={p.trackingId} variant="button" />
                       </div>
                     </td>
                     <td className="hidden px-5 py-3 text-slate-600 md:table-cell">
