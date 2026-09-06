@@ -316,6 +316,7 @@ function PaymentPayDialog({ payment, onClose, onDone }) {
 
   /* M-Pesa: phone + start/retry state and light polling of OUR backend only. */
   const [phone, setPhone] = useState("");
+  const [mmPhone, setMmPhone] = useState("");
   const [mpesaBusy, setMpesaBusy] = useState(false);
   const [mpesaError, setMpesaError] = useState("");
   const isMpesaWait = prov && (st === "PENDING" || st === "PROCESSING");
@@ -374,11 +375,22 @@ function PaymentPayDialog({ payment, onClose, onDone }) {
 
   const dialNow = async () => {
     if (!mm?.dialUrl) return;
+    if (!mmPhone.trim()) {
+      setSubError("Enter your phone number so we can send the payment request.");
+      return;
+    }
+    setMpesaBusy(true);
+    setSubError("");
     try {
+      // The full dial code (with the private settlement number) is built and
+      // returned ONLY on this explicit tap — the dialer opens with the USSD
+      // ready to confirm, like an M-Pesa push. No number is ever rendered.
       const telUri = await fetchDialUri(mm.dialUrl);
       window.location.href = telUri; // user-initiated (button tap)
     } catch (err) {
       setSubError(err?.response?.data?.message || "Could not open the dialer right now.");
+    } finally {
+      setMpesaBusy(false);
     }
   };
 
@@ -407,7 +419,7 @@ function PaymentPayDialog({ payment, onClose, onDone }) {
 
   return (
     <Dialog open onOpenChange={(o) => !o && !submitting && onClose()}>
-      <DialogContent className="max-w-md rounded-2xl">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-md sm:max-w-xl rounded-2xl max-h-[86vh] overflow-y-auto overscroll-contain">
         {busy ? (
           <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading payment…
@@ -470,13 +482,39 @@ function PaymentPayDialog({ payment, onClose, onDone }) {
                     </div>
                   ) : null}
                   {mm.dialUrl ? (
-                    <button
-                      type="button"
-                      onClick={dialNow}
-                      className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-accent text-[15px] font-bold text-accent-foreground shadow-sm transition hover:bg-accent/90"
-                    >
-                      <Smartphone className="h-4.5 w-4.5" style={{ width: 18, height: 18 }} /> Pay on phone
-                    </button>
+                    <div className="mt-3 space-y-2 text-left">
+                      <div className="relative">
+                        <Input
+                          id="mm-phone"
+                          value={mmPhone}
+                          onChange={(e) => setMmPhone(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              dialNow();
+                            }
+                          }}
+                          placeholder="Your phone number — e.g. 0772XXXXXX or +256…"
+                          className="h-11 w-full rounded-[10px]"
+                          maxLength={20}
+                          inputMode="tel"
+                          autoComplete="tel"
+                        />
+                      </div>
+                      <p className="text-[11.5px] leading-relaxed text-slate-400">
+                        Like M-Pesa: enter your phone and we deliver the USSD code to your dialer automatically —
+                        confirm with your mobile-money PIN. SwiftKifisha never asks for your PIN.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={dialNow}
+                        disabled={mpesaBusy || !mmPhone.trim()}
+                        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-accent text-[15px] font-bold text-accent-foreground shadow-sm transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {mpesaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Smartphone className="h-4.5 w-4.5" style={{ width: 18, height: 18 }} />}
+                        {mpesaBusy ? "Sending USSD…" : "Send USSD to my phone"}
+                      </button>
+                    </div>
                   ) : null}
                 </div>
 
@@ -554,10 +592,18 @@ function PaymentPayDialog({ payment, onClose, onDone }) {
                       id="mpesa-phone"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          if (!mpesaBusy) sendMpesa();
+                        }
+                      }}
                       placeholder="e.g. 0712XXXXXX or +2547XXXXXXXX"
                       className="mt-1.5"
                       maxLength={20}
                       inputMode="tel"
+                      autoComplete="tel"
+                      autoFocus
                     />
                     <p className="mt-1 text-[11.5px] text-slate-400">
                       We send a payment request to this phone — you confirm with your M-Pesa PIN in the M-Pesa prompt.
@@ -586,9 +632,16 @@ function PaymentPayDialog({ payment, onClose, onDone }) {
                     id="pay-ref"
                     value={reference}
                     onChange={(e) => setReference(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (!submitting) submitRef();
+                      }
+                    }}
                     placeholder="e.g. MM-77881245-UGX"
                     className="mt-1.5"
                     maxLength={80}
+                    autoComplete="off"
                   />
                 </div>
                 <div>
@@ -815,8 +868,10 @@ export default function BillingPage() {
         setTopupWallet(w);
         const rows = Array.isArray(w.channels) ? w.channels : [];
         const hasMobileMoney = rows.some((c) => c.code === "MOBILE_MONEY");
-        // Backend default: MOBILE_MONEY when enabled, else OFFLINE.
-        setTopupChannel((cur) => cur || (hasMobileMoney ? "MOBILE_MONEY" : "OFFLINE"));
+        const hasOffline = rows.some((c) => c.code === "OFFLINE");
+        const hasMpesa = rows.some((c) => c.code === "MPESA" && c.configured === true);
+        // Backend default: MOBILE_MONEY → OFFLINE → M-Pesa.
+        setTopupChannel((cur) => cur || (hasMobileMoney ? "MOBILE_MONEY" : hasOffline ? "OFFLINE" : hasMpesa ? "MPESA" : ""));
       })
       .catch(() => setTopupWalletError("Could not load your wallet — try again."))
       .finally(() => setTopupWalletBusy(false));
@@ -853,19 +908,31 @@ export default function BillingPage() {
     if (!topupWallet) return;
     setTopupFieldError("");
     setTopupError("");
-    const cur = topupWallet.walletCurrency || topupWallet.currency || "USD";
     const amount = Number(topupAmount);
     if (!topupAmount.trim() || !Number.isFinite(amount) || amount <= 0) {
       setTopupFieldError("Enter the amount you want to add.");
       return;
     }
-    if (topupWallet.minTopup && amount < Number(topupWallet.minTopup.amount)) {
+    if (topupChannel === "MPESA") {
+      if (!Number.isInteger(amount)) {
+        setTopupFieldError("M-Pesa top-ups are whole KES amounts.");
+        return;
+      }
+      if (amount < KES_MIN) {
+        setTopupFieldError(`Minimum M-Pesa top-up is ${KES_MIN} KES.`);
+        return;
+      }
+    } else if (topupWallet.minTopup && amount < Number(topupWallet.minTopup.amount)) {
       setTopupFieldError("Minimum top-up is " + topupMinNote(topupWallet) + ".");
       return;
     }
     setTopupSubmitting(true);
     try {
-      const res = await topUpWallet({ amount, channel: topupChannel || undefined });
+      const res = await topUpWallet({
+        amount,
+        channel: topupChannel || undefined,
+        ...(topupChannel === "MPESA" ? { currency: "KES" } : {}),
+      });
       setTopupResult(res);
       toast.success(res.message || "Top-up request sent");
     } catch (err) {
@@ -934,18 +1001,26 @@ export default function BillingPage() {
 
   /* Top-up dialog derived values (live channels → chooser options, momo config, built USSD string). */
   const topupAmountNum = Number(topupAmount);
+  const KES_MIN = 100;
+  const topupMinForChannel = topupChannel === "MPESA"
+    ? KES_MIN
+    : Number(topupWallet?.minTopup?.amount ?? 0);
   const topupAmountValid =
     topupWallet !== null &&
     topupAmount.trim() !== "" &&
     Number.isFinite(topupAmountNum) &&
     topupAmountNum > 0 &&
-    (!topupWallet.minTopup || topupAmountNum >= Number(topupWallet.minTopup.amount));
+    (topupMinForChannel <= 0 || topupAmountNum >= topupMinForChannel) &&
+    (topupChannel !== "MPESA" || Number.isInteger(topupAmountNum));
   const topupChannelRows = Array.isArray(topupWallet?.channels) ? topupWallet.channels : [];
   const mmChannel = topupChannelRows.find((c) => c.code === "MOBILE_MONEY") || null;
   const offlineChannel = topupChannelRows.find((c) => c.code === "OFFLINE") || null;
+  const mpChannel = topupChannelRows.find((c) => c.code === "MPESA" && c.configured === true) || null;
   const momoConfig = topupWallet?.momo || null; // public summary {method, network, enabled} only
   const topupWalletCur = topupWallet ? topupWallet.walletCurrency || topupWallet.currency || "USD" : "USD";
-  const showTopupChooser = Boolean(mmChannel || offlineChannel);
+  // M-Pesa (Daraja) settles in KES; other manual options use the wallet currency.
+  const topupPayCur = topupChannel === "MPESA" ? "KES" : topupWalletCur;
+  const showTopupChooser = Boolean(mmChannel || offlineChannel || mpChannel);
   // The public code/QR for an exact amount is delivered per payment (see the
   // payment card after a top-up) — never built from private config here.
   const ussdCode = null;
@@ -1525,7 +1600,7 @@ export default function BillingPage() {
 
       {/* --------------------------- pay from wallet dialog --------------------------- */}
       <Dialog open={Boolean(payTarget)} onOpenChange={(o) => !o && closePay()}>
-        <DialogContent className="max-w-md rounded-2xl">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-md sm:max-w-xl rounded-2xl max-h-[86vh] overflow-y-auto overscroll-contain">
           {payTarget && (
             <>
               <DialogHeader>
@@ -1605,7 +1680,7 @@ export default function BillingPage() {
 
       {/* --------------------------- cancel invoice dialog --------------------------- */}
       <Dialog open={Boolean(cancelTarget)} onOpenChange={(o) => !o && closeCancel()}>
-        <DialogContent className="max-w-md rounded-2xl">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-md sm:max-w-xl rounded-2xl max-h-[86vh] overflow-y-auto overscroll-contain">
           {cancelTarget && (
             <>
               <DialogHeader>
@@ -1650,7 +1725,7 @@ export default function BillingPage() {
 
       {/* --------------------------- cancel payment dialog --------------------------- */}
       <Dialog open={Boolean(paymentCancelTarget)} onOpenChange={(o) => !o && closePaymentCancel()}>
-        <DialogContent className="max-w-md rounded-2xl">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-md sm:max-w-xl rounded-2xl max-h-[86vh] overflow-y-auto overscroll-contain">
           {paymentCancelTarget && (
             <>
               <DialogHeader>
@@ -1692,7 +1767,7 @@ export default function BillingPage() {
 
       {/* --------------------------- top up wallet dialog --------------------------- */}
       <Dialog open={topupOpen} onOpenChange={(o) => !o && closeTopup()}>
-        <DialogContent className="max-w-md rounded-2xl">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-md sm:max-w-xl rounded-2xl max-h-[86vh] overflow-y-auto overscroll-contain">
           {topupResult ? (
             <>
               <DialogHeader>
@@ -1762,7 +1837,9 @@ export default function BillingPage() {
               </p>
 
               <DialogFooter className="sm:justify-between">
-                {(topupResult.payment?.channel === "MOBILE_MONEY" || topupResult.payment?.channel === "OFFLINE") &&
+                {(topupResult.payment?.channel === "MOBILE_MONEY" ||
+                  topupResult.payment?.channel === "OFFLINE" ||
+                  topupResult.payment?.channel === "MPESA") &&
                 topupResult.payment?.status === "PENDING" ? (
                   <Button
                     type="button"
@@ -1774,7 +1851,7 @@ export default function BillingPage() {
                     }}
                     className="gap-2 bg-accent font-bold text-accent-foreground hover:bg-accent/90"
                   >
-                    <Smartphone className="h-4 w-4" /> Scan & pay now
+                    <Smartphone className="h-4 w-4" /> {topupResult.payment?.channel === "MPESA" ? "Continue to M-Pesa" : "Scan & pay now"}
                   </Button>
                 ) : (
                   <span />
@@ -1852,20 +1929,18 @@ export default function BillingPage() {
                       aria-hidden="true"
                       className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[14px] font-bold text-slate-400"
                     >
-                      {topupWallet ? curSymbol(topupWallet.walletCurrency || topupWallet.currency || "USD") : "…"}
+                      {topupChannel === "MPESA" ? "KES" : topupWallet ? curSymbol(topupWallet.walletCurrency || topupWallet.currency || "USD") : "…"}
                     </span>
                     <Input
                       id="tu-amount"
                       type="number"
                       min="0"
-                      step="any"
+                      step={topupChannel === "MPESA" ? "1" : "any"}
+                      inputMode={topupChannel === "MPESA" ? "numeric" : "decimal"}
                       value={topupAmount}
                       onChange={(e) => setTopupAmount(e.target.value)}
-                      placeholder={
-                        topupWallet && (topupWallet.walletCurrency || topupWallet.currency) === "UGX"
-                          ? "e.g. 50000"
-                          : "e.g. 25.00"
-                      }
+                      autoFocus
+                      placeholder={topupChannel === "MPESA" ? "e.g. 100" : topupWallet && (topupWallet.walletCurrency || topupWallet.currency) === "UGX" ? "e.g. 50000" : "e.g. 25.00"}
                       className={inputCls + " pl-14" + (topupFieldError ? " border-destructive/60" : "")}
                       disabled={!topupWallet}
                     />
@@ -1873,15 +1948,20 @@ export default function BillingPage() {
                   {topupFieldError && (
                     <p className="text-[12.5px] font-medium text-destructive">{topupFieldError}</p>
                   )}
-                  {topupWallet &&
+                  {topupChannel === "MPESA" ? (
+                    <p className="text-[12px] text-slate-400">
+                      M-Pesa (Daraja) settles in KES — whole amounts, minimum {KES_MIN} KES. After the request you
+                      confirm with your M-Pesa PIN.
+                    </p>
+                  ) : topupWallet &&
                     !topupWalletError &&
                     (topupWallet.walletCurrency || topupWallet.currency) === "UGX" &&
-                    Number(topupWallet.rateUsdUgx) > 0 && (
-                      <p className="text-[12px] text-slate-400">
-                        Guide rate: 1 USD ≈ {Number(topupWallet.rateUsdUgx).toLocaleString("en-US")} UGX — the exact
-                        rate is fixed when finance verifies the payment.
-                      </p>
-                    )}
+                    Number(topupWallet.rateUsdUgx) > 0 ? (
+                    <p className="text-[12px] text-slate-400">
+                      Guide rate: 1 USD ≈ {Number(topupWallet.rateUsdUgx).toLocaleString("en-US")} UGX — the exact
+                      rate is fixed when finance verifies the payment.
+                    </p>
+                  ) : null}
                 </div>
 
                 {showTopupChooser && (
@@ -1923,6 +2003,43 @@ export default function BillingPage() {
                                 {momoConfig.networkLabel ? momoConfig.networkLabel : "Mobile money"}
                               </span>
                             )}
+                          </span>
+                        </button>
+                      )}
+                      {mpChannel && (
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={topupChannel === "MPESA"}
+                          onClick={() => setTopupChannel("MPESA")}
+                          className={
+                            "flex w-full items-center gap-3 rounded-lg border px-3.5 py-3 text-left transition-colors " +
+                            (topupChannel === "MPESA"
+                              ? "border-primary/40 bg-primary/5"
+                              : "border-[#e5eaf2] bg-white hover:border-slate-300")
+                          }
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={
+                              "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 " +
+                              (topupChannel === "MPESA" ? "border-primary" : "border-slate-300")
+                            }
+                          >
+                            {topupChannel === "MPESA" && (
+                              <span className="h-2 w-2 rounded-full bg-primary" />
+                            )}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[13.5px] font-bold text-foreground">
+                              M-Pesa (Daraja)
+                            </span>
+                            <span className="mt-0.5 block truncate text-[12px] text-slate-500">
+                              API-confirmed payments in KES — request is sent to your phone
+                            </span>
+                          </span>
+                          <span className="inline-flex shrink-0 items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-emerald-700">
+                            Connected
                           </span>
                         </button>
                       )}
@@ -1999,7 +2116,7 @@ export default function BillingPage() {
                     <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Payment channels</p>
                     <ul className="space-y-1.5">
                       {topupChannelRows
-                        .filter((ch) => ch.code !== "MOBILE_MONEY" && ch.code !== "OFFLINE")
+                        .filter((ch) => ch.code !== "MOBILE_MONEY" && ch.code !== "OFFLINE" && !(ch.code === "MPESA" && mpChannel))
                         .map((ch) => (
                           <ChannelStatusRow key={ch.code || ch.label || "channel"} channel={ch} />
                         ))}
@@ -2034,7 +2151,7 @@ export default function BillingPage() {
 
       {/* --------------------------- redeem points dialog --------------------------- */}
       <Dialog open={redeemOpen} onOpenChange={(o) => !o && closeRedeem()}>
-        <DialogContent className="max-w-md rounded-2xl">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-md sm:max-w-xl rounded-2xl max-h-[86vh] overflow-y-auto overscroll-contain">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-display">
               <Coins className="h-5 w-5 text-primary" /> Redeem points

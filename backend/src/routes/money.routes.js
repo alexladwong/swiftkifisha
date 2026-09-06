@@ -607,6 +607,27 @@ router.get("/payments/:id/mobile-money-dial", requireAuth, ah(async (req, res) =
   return res.json({ telUri: ussdTelUri(dial) });
 }));
 
+/** GET /api/payments/:id/recipient — payer-only recipient reveal for active
+ * manual mobile-money payments (operator Send Money menus require typing the
+ * recipient). Masked by default; full number only on explicit reveal. */
+router.get("/payments/:id/recipient", requireAuth, ah(async (req, res) => {
+  const user = memberByToken(req);
+  const payment = (db.data.payments || []).find((x) => (x._id === req.params.id || x.paymentId === req.params.id) && x.customerEmail === user.email);
+  if (!payment || payment.channel !== "MOBILE_MONEY" || !["PENDING", "PAYMENT_SUBMITTED"].includes(payment.status)) {
+    return res.status(404).json({ message: "Payment not found." });
+  }
+  const momo = momoTopupConfig();
+  const reveal = req.query.reveal === "true";
+  const masked = maskedNumber(momo.number);
+  res.setHeader("Cache-Control", "no-store");
+  return res.json({
+    recipientName: "SwiftKifisha",
+    network: momo.networkLabel,
+    masked: reveal ? momo.number : masked,
+    revealable: true,
+  });
+}));
+
 /**
  * POST /api/payments/:id/submit — member submits their transaction reference
  * after paying. NEVER marks the payment paid: it moves PENDING →

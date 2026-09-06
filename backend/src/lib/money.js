@@ -111,15 +111,28 @@ export const CHANNELS = [
  * ussdTemplate placeholders: {amount} and {number} — the member's phone scans
  * the QR, opens the USSD code and confirms with their MoMo PIN.
  */
+/**
+ * Operator-verified Uganda codes (June 2026): menus/send deep-paths only —
+ * one-shot amount+recipient deep-links are retired by the networks
+ * ("code no longer in service"). The payer completes recipient/amount/PIN in
+ * the operator menu. Dial template may also be a send shortcut like *185*1#.
+ */
+export const MOMO_NETWORK_PRESETS = {
+  MTN: { label: "MTN Mobile Money (Uganda)", public: "*165*1#", dial: "*165*1#" },
+  AIRTEL: { label: "Airtel Money (Uganda)", public: "*185*1#", dial: "*185*1#" },
+};
+
 export const MOMO_DEFAULT = {
   enabled: true,
-  // PRIVATE settlement number — never exposed to members, never embedded in
-  // the customer QR/USSD. Admin screens show it masked (+256 75•••••291).
+  // PRIVATE settlement number — shown only to the payer of an active payment
+  // (operator Send Money menus require typing the recipient). Admin screens
+  // show it masked (+256 75•••••291).
   number: "+256757889291",
   networkLabel: "MTN Mobile Money (Uganda)",
   network: "MTN",
-  // Public template: {amount} only. The receive number must NOT appear here.
-  ussdTemplate: "*165*1*{amount}#",
+  // Operator-verified send codes (menu/shortcut) — no recipient in the code.
+  ussdTemplate: MOMO_NETWORK_PRESETS.MTN.public,
+  dialTemplate: MOMO_NETWORK_PRESETS.MTN.dial,
 };
 
 /**
@@ -127,13 +140,8 @@ export const MOMO_DEFAULT = {
  * only ever used server-side to build the QR image and the on-tap dial URI;
  * it is never returned to member payloads and never rendered by the frontend.
  */
-export const MOMO_DIAL_DEFAULT = "*165*1*{amount}*{number}#";
+export const MOMO_DIAL_DEFAULT = "*165*1#";
 
-/** Per-network public templates (Airtel dials *185*1*1*<amount>#). */
-export const MOMO_NETWORK_PRESETS = {
-  MTN: { label: "MTN Mobile Money (Uganda)", template: "*165*1*{amount}#" },
-  AIRTEL: { label: "Airtel Money (Uganda)", template: "*185*1*1*{amount}#" },
-};
 
 /** Strips legacy {number} tokens (and a stray preceding '*') from templates. */
 export function normalizeUssdTemplate(template) {
@@ -146,12 +154,15 @@ export function momoTopupConfig() {
   const cfg = getSetting("paymentConfig", null);
   const momo = cfg?.momo || {};
   const merged = { ...MOMO_DEFAULT, ...momo };
-  if (String(merged.ussdTemplate || "").includes("{number}")) {
-    merged.ussdTemplate = normalizeUssdTemplate(merged.ussdTemplate) || MOMO_DEFAULT.ussdTemplate;
-    // One-time migration: rewrite the stored config so legacy values stop
-    // re-entering memory on every boot.
+  const preset = MOMO_NETWORK_PRESETS[String(momo.network || merged.network || "").toUpperCase()] || MOMO_NETWORK_PRESETS.MTN;
+  const retired = /\*\d+\*1\*1\*/.test(String(merged.ussdTemplate || "")) || String(merged.ussdTemplate || "").includes("{number}");
+  if (retired || String(merged.dialTemplate || "").includes("{number}") || !merged.dialTemplate) {
+    // Retired deep-links (e.g. *185*1*1*amount*number#) are replaced with the
+    // operator-verified send code; persist once so it never re-enters memory.
+    merged.ussdTemplate = preset.public;
+    merged.dialTemplate = preset.dial;
     try {
-      setSetting("paymentConfig", { ...cfg, momo: { ...momo, ussdTemplate: merged.ussdTemplate } });
+      setSetting("paymentConfig", { ...cfg, momo: { ...momo, ussdTemplate: preset.public, dialTemplate: preset.dial, networkLabel: preset.label } });
     } catch { /* best effort */ }
   }
   return merged;
@@ -208,7 +219,9 @@ export function validPublicUssdTemplate(template, number) {
   if (digits.length >= 7 && tpl.replace(/\D/g, "").includes(digits)) {
     return "The template must not contain the receive number.";
   }
-  if (!tpl.includes("{amount}")) return "The template must contain the {amount} placeholder.";
+  if (!tpl.includes("{amount}") && !/^\*[0-9*#]+$/.test(tpl)) {
+    return "The template must contain the {amount} placeholder or be a plain menu code like *185*1#.";
+  }
   return null;
 }
 
