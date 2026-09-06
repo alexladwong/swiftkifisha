@@ -1,7 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+
+const timeAgo = (iso) => {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return new Date(iso).toLocaleDateString();
+};
 import { toast } from "sonner";
 import { Inbox as InboxIcon, RefreshCw, CheckCheck, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { axiosInstance } from "@/services/axiosInstance";
@@ -16,12 +29,15 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState({});
   const [busyEmail, setBusyEmail] = useState(null);
+  const [search, setSearch] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await axiosInstance.get("/messages");
       setMessages(data.messages || []);
+      setUnreadCount(data.unread || 0);
     } catch {
       toast.error("Could not load messages.");
     } finally {
@@ -31,19 +47,27 @@ export default function MessagesPage() {
 
   useEffect(() => {
     load();
+    const id = setInterval(load, 30000);
+    return () => clearInterval(id);
   }, [load]);
 
   const threads = useMemo(() => {
+    const q = search.trim().toLowerCase();
     const map = new Map();
     for (const m of [...messages].reverse()) {
+      if (q && !m.email.toLowerCase().includes(q) && !m.name.toLowerCase().includes(q)) continue;
       if (!map.has(m.email)) map.set(m.email, { email: m.email, name: m.name, items: [] });
       map.get(m.email).items.push(m);
     }
-    return [...map.values()].sort((a, b) => {
+    const list = [...map.values()];
+    list.sort((a, b) => {
+      const hasUnread = (t) => t.items.some((m) => m.direction === "in" && !m.read);
+      if (hasUnread(a) !== hasUnread(b)) return hasUnread(a) ? -1 : 1;
       const last = (arr) => new Date(arr[arr.length - 1].createdAt).getTime();
       return last(b.items) - last(a.items);
     });
-  }, [messages]);
+    return list;
+  }, [messages, search]);
 
   const markRead = async (id) => {
     await axiosInstance.post(`/messages/${id}/read`).catch(() => {});
@@ -85,9 +109,17 @@ export default function MessagesPage() {
             </p>
           </div>
         </div>
-        <Button variant="outline" size="icon" onClick={load} title="Refresh">
-          <RefreshCw className={"h-4 w-4 " + (loading ? "animate-spin" : "")} />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Search customer or email…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-9 w-48 text-sm sm:w-64"
+          />
+          <Button variant="outline" size="icon" onClick={load} title="Refresh">
+            <RefreshCw className={"h-4 w-4 " + (loading ? "animate-spin" : "")} />
+          </Button>
+        </div>
       </header>
 
       {!loading && threads.length === 0 ? (
@@ -110,6 +142,9 @@ export default function MessagesPage() {
                   {thread.items.some((m) => m.direction === "in" && !m.read) && (
                     <span className="rounded-full bg-red-100 px-2 py-0.5 font-semibold text-red-700">unread</span>
                   )}
+                  {unreadCount > 0 && (
+                    <span className="rounded-full bg-muted px-2 py-0.5 font-medium">{unreadCount} unread total</span>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -131,8 +166,7 @@ export default function MessagesPage() {
                       }
                     >
                       <p className="text-[11px] font-semibold uppercase text-muted-foreground">
-                        {m.direction === "in" ? thread.name : "You"} ·{" "}
-                        {new Date(m.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                        {m.direction === "in" ? thread.name : "You"} · {timeAgo(m.createdAt)}
                       </p>
                       {m.subject && <p className="mt-0.5 font-semibold">{m.subject}</p>}
                       <p className="mt-0.5 whitespace-pre-line">{m.body}</p>

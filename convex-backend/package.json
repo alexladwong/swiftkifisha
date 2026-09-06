@@ -10,7 +10,8 @@
     "deploy:prod": "convex deploy --prod",
     "seed": "convex run seed:all",
     "auth:generate": "auth generate --config ./convex/betterAuth/auth.ts --output ./convex/betterAuth/schema.ts",
-    "parity": "tsx scripts/parity-check.mjs"
+    "parity": "tsx scripts/parity-check.mjs",
+    "sync:express": "node scripts/import-express-data.mjs"
   },
   "dependencies": {
     "@convex-dev/better-auth": "^0.12.5",

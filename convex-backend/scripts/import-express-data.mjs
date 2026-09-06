@@ -91,3 +91,23 @@ for (let i = 0; i < parcels.length; i += CHUNK) {
   console.log(`  chunk ${i / CHUNK + 1}: inserted ${res.inserted ?? "?"}`);
 }
 console.log(`Done — ${insertedTotal} parcels imported.`);
+
+/* ---- Communications collections (mirror Neon into Convex) ---- */
+const strip = (row) => {
+  const clean = {};
+  for (const [k, v] of Object.entries(row || {})) {
+    if (v !== undefined && v !== null) clean[k] = v;
+  }
+  delete clean._id;
+  return clean;
+};
+
+for (const [col, fn, rows] of [
+  ["applications", "sync:importApplications", data.applications || []],
+  ["messages", "sync:importMessages", data.messages || []],
+  ["announcements", "sync:importAnnouncements", data.announcements || []],
+]) {
+  const out = run(fn, { rows: rows.map((r) => ({ refId: String(r._id), ...strip(r) })) });
+  const res = parseReturn(out);
+  console.log(`${col}: imported ${res.inserted ?? "?"}`);
+}

@@ -34,6 +34,43 @@ export default defineSchema({
     .index("by_token", ["token"])
     .index("by_email", ["email"]),
 
+  // Communications sync (mirrors the Express/Neon store).
+  applications: defineTable({
+    refId: v.string(),
+    name: v.string(),
+    email: v.string(),
+    phone: v.string(),
+    homeCountry: v.string(),
+    message: v.string(),
+    status: v.string(),
+    note: v.string(),
+    reviewedBy: v.string(),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  }).index("by_email", ["email"]),
+
+  messages: defineTable({
+    refId: v.string(),
+    email: v.string(),
+    name: v.string(),
+    subject: v.string(),
+    body: v.string(),
+    direction: v.string(),
+    read: v.boolean(),
+    createdAt: v.string(),
+  }).index("by_email", ["email"]),
+
+  announcements: defineTable({
+    refId: v.string(),
+    title: v.string(),
+    body: v.string(),
+    type: v.string(),
+    audience: v.string(),
+    region: v.string(),
+    createdBy: v.string(),
+    createdAt: v.string(),
+  }).index("by_createdAt", ["createdAt"]),
+
   // Admin passwordless sign-in codes (email + hashed 6-digit OTP, 5 min TTL).
   adminOtps: defineTable({
     email: v.string(),

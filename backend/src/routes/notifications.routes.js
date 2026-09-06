@@ -92,6 +92,36 @@ router.get("/messages/me", requireAuth, ah(async (req, res) => {
   return res.json({ messages: rows, unread: 0 });
 }));
 
+/** GET /api/messages/me/unread-count — member badge (does not mark read). */
+router.get("/messages/me/unread-count", requireAuth, ah(async (req, res) => {
+  const user = db.data.users.find((u) => u._id === req.user._id);
+  if (!user) return res.status(401).json({ message: "Account not found." });
+  const unread = (db.data.messages || []).filter((m) => m.email === user.email && m.direction === "out" && !m.read).length;
+  return res.json({ unread });
+}));
+
+/**
+ * GET /api/notifications/summary — member bell: unread support replies plus
+ * the latest announcements that target them.
+ */
+router.get("/notifications/summary", requireAuth, ah(async (req, res) => {
+  const user = db.data.users.find((u) => u._id === req.user._id);
+  if (!user) return res.status(401).json({ message: "Account not found." });
+  const member = (db.data.members || []).find((m) => m.email === user.email);
+  const regions = new Set(member ? [member.homeCountry] : []);
+  for (const p of db.data.parcels || []) {
+    if (p.memberEmail === user.email && p.destinationCountry) regions.add(p.destinationCountry);
+  }
+  const recent = [...(db.data.announcements || [])]
+    .filter((a) => a.audience === "all" || (a.region && regions.has(a.region)))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 5);
+  const unreadMessages = (db.data.messages || []).filter(
+    (m) => m.email === user.email && m.direction === "out" && !m.read,
+  ).length;
+  return res.json({ unreadMessages, announcements: recent });
+}));
+
 /** POST /api/messages/me — member writes to support. */
 router.post("/messages/me", requireAuth, ah(async (req, res) => {
   const user = db.data.users.find((u) => u._id === req.user._id);

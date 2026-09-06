@@ -35,6 +35,7 @@ import SideDrawer from "@/components/layout/SideDrawer";
 import DrawerNav from "@/components/layout/DrawerNav";
 import AuthDialog from "@/components/AuthDialog";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import NotificationBell from "@/components/NotificationBell";
 
 import { useI18n } from "@/i18n";
 import { logout } from "@/features/auth/authSlice";

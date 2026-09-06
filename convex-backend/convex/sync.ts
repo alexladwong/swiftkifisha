@@ -46,6 +46,21 @@ const parcelFields = {
   checkpoints: v.array(checkpointSchema),
 };
 
+function wipeAndInsert(ctx: any, table: string, rows: any[]) {
+  const existing = ctx.db.query(table) as any;
+  return existing.collect().then(async (docs: any[]) => {
+    for (const row of docs) await ctx.db.delete(row._id);
+    let inserted = 0;
+    for (const row of rows) {
+      const clean: Record<string, any> = {};
+      for (const [k, v] of Object.entries(row)) if (v !== undefined && v !== null) clean[k] = v;
+      await ctx.db.insert(table, clean);
+      inserted += 1;
+    }
+    return { inserted };
+  });
+}
+
 /** Replaces every member row and returns { email: newId } for remapping. */
 export const importMembers = mutation({
   args: { members: v.array(v.object(memberFields)) },
@@ -82,4 +97,31 @@ export const importParcels = mutation({
     }
     return { inserted };
   },
+});
+
+
+/** Replace-style imports for the communications collections (mirror Neon). */
+export const importApplications = mutation({
+  args: { rows: v.array(v.object({
+    refId: v.string(), name: v.string(), email: v.string(), phone: v.string(),
+    homeCountry: v.string(), message: v.string(), status: v.string(), note: v.string(),
+    reviewedBy: v.string(), createdAt: v.string(), updatedAt: v.string(),
+  })) },
+  handler: (ctx, { rows }) => wipeAndInsert(ctx, "applications", rows),
+});
+
+export const importMessages = mutation({
+  args: { rows: v.array(v.object({
+    refId: v.string(), email: v.string(), name: v.string(), subject: v.string(),
+    body: v.string(), direction: v.string(), read: v.boolean(), createdAt: v.string(),
+  })) },
+  handler: (ctx, { rows }) => wipeAndInsert(ctx, "messages", rows),
+});
+
+export const importAnnouncements = mutation({
+  args: { rows: v.array(v.object({
+    refId: v.string(), title: v.string(), body: v.string(), type: v.string(),
+    audience: v.string(), region: v.string(), createdBy: v.string(), createdAt: v.string(),
+  })) },
+  handler: (ctx, { rows }) => wipeAndInsert(ctx, "announcements", rows),
 });
