@@ -13,7 +13,7 @@ import { ensureEnabled, push } from "./remoteStore.js";
 class JsonDb {
   constructor(file) {
     this.file = file;
-    this.data = { users: [], members: [], parcels: [], resetTokens: [], applications: [], messages: [], announcements: [] };
+    this.data = { users: [], members: [], parcels: [], resetTokens: [], applications: [], messages: [], announcements: [], warehouses: [], packages: [], pricingRules: [], carriers: [], auditLogs: [], quotes: [], warehouses: [], packages: [], pricingRules: [], carriers: [], auditLogs: [], quotes: [] };
     this.load();
   }
 
@@ -26,13 +26,19 @@ class JsonDb {
         members: Array.isArray(parsed?.members) ? parsed.members : [],
         parcels: Array.isArray(parsed?.parcels) ? parsed.parcels : [],
         resetTokens: Array.isArray(parsed?.resetTokens) ? parsed.resetTokens : [],
+        warehouses: Array.isArray(parsed?.warehouses) ? parsed.warehouses : [],
+        packages: Array.isArray(parsed?.packages) ? parsed.packages : [],
+        pricingRules: Array.isArray(parsed?.pricingRules) ? parsed.pricingRules : [],
+        carriers: Array.isArray(parsed?.carriers) ? parsed.carriers : [],
+        auditLogs: Array.isArray(parsed?.auditLogs) ? parsed.auditLogs : [],
+        quotes: Array.isArray(parsed?.quotes) ? parsed.quotes : [],
         applications: Array.isArray(parsed?.applications) ? parsed.applications : [],
         messages: Array.isArray(parsed?.messages) ? parsed.messages : [],
         announcements: Array.isArray(parsed?.announcements) ? parsed.announcements : [],
       };
     } catch (err) {
       console.error("[db] Corrupt database file, starting empty:", err.message);
-      this.data = { users: [], members: [], parcels: [], resetTokens: [], applications: [], messages: [], announcements: [] };
+      this.data = { users: [], members: [], parcels: [], resetTokens: [], applications: [], messages: [], announcements: [], warehouses: [], packages: [], pricingRules: [], carriers: [], auditLogs: [], quotes: [], warehouses: [], packages: [], pricingRules: [], carriers: [], auditLogs: [], quotes: [] };
     }
   }
 

@@ -53,6 +53,7 @@ export async function ensureSchema(p = null) {
 export const SYNC_COLLECTIONS = [
   "users", "members", "parcels", "resetTokens",
   "applications", "messages", "announcements",
+  "warehouses", "packages", "pricingRules", "carriers", "auditLogs", "quotes",
 ];
 
 export async function pull(p = null) {
@@ -68,8 +69,12 @@ export async function pull(p = null) {
 }
 
 /**
- * Pushes the full dataset to Postgres inside one transaction (replace-style
- * upsert). Datasets are small (hundreds of rows) and writes are rare.
+ * Pushes the full dataset to Postgres inside one transaction.
+ *
+ * Merge semantics (NOT delete-and-replace): every local doc is upserted, but
+ * no collection is ever wiped. A process that loaded an older/partial dataset
+ * therefore can never erase rows it did not load (that race wiped collections
+ * in earlier builds). Explicit removals must go through removeDocs().
  */
 export async function push(data, p = null) {
   const client = p || (await connectPool());
@@ -77,13 +82,14 @@ export async function push(data, p = null) {
   const tx = await client.connect();
   try {
     await tx.query("BEGIN");
-    await tx.query("DELETE FROM SwiftKifisha_sync");
     const params = [];
     const rows = [];
+    let count = 0;
     for (const collection of SYNC_COLLECTIONS) {
       for (const doc of data[collection] || []) {
         params.push(collection, String(doc._id), JSON.stringify(doc));
         rows.push("($" + (params.length - 2) + "::text, $" + (params.length - 1) + "::text, $" + params.length + "::jsonb)");
+        count += 1;
       }
     }
     if (rows.length) {
@@ -94,6 +100,7 @@ export async function push(data, p = null) {
       await tx.query(sql, params);
     }
     await tx.query("COMMIT");
+    if (count) console.log(`[remote] synced ${count} doc(s) to Neon (merge)`);
     return true;
   } catch (err) {
     await tx.query("ROLLBACK");
@@ -101,6 +108,21 @@ export async function push(data, p = null) {
     return false;
   } finally {
     tx.release();
+  }
+}
+
+/** Explicitly removes exact (collection, id) rows (admin purges, GDPR). */
+export async function removeDocs(pairs, p = null) {
+  const client = p || (await connectPool());
+  if (!client) return false;
+  try {
+    for (const [collection, id] of pairs) {
+      await client.query("DELETE FROM SwiftKifisha_sync WHERE collection = $1 AND id = $2", [collection, String(id)]);
+    }
+    return true;
+  } catch (err) {
+    console.error("[remote] remove failed:", err.message);
+    return false;
   }
 }
 

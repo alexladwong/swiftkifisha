@@ -21,6 +21,9 @@ import ProfilePage from "@/pages/Profile";
 import MembershipApplicationsPage from "@/pages/MembershipApplications";
 import MessagesPage from "@/pages/Messages";
 import AnnouncementsPage from "@/pages/Announcements";
+import Warehouses from "@/pages/Warehouses";
+import Receiving from "@/pages/Receiving";
+import WarehousePackages from "@/pages/WarehousePackages";
 
 const App = () => (
   <TooltipProvider>
@@ -37,6 +40,9 @@ const App = () => (
             <Route path="/" element={<Dashboard />} />
             <Route path="/create-parcel" element={<CreateParcel />} />
             <Route path="/manage-parcels" element={<ManageParcels />} />
+            <Route path="/warehouses" element={<Warehouses />} />
+            <Route path="/receiving" element={<Receiving />} />
+            <Route path="/packages" element={<WarehousePackages />} />
             <Route path="/parcel/:id" element={<ParcelDetails />} />
             <Route path="/tracking" element={<ParcelTracking />} />
             <Route path="/analytics" element={<Analytics />} />

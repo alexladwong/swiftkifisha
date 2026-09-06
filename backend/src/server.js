@@ -3,6 +3,7 @@ import app from "./app.js";
 import { seedIfEmpty } from "./lib/seed.js";
 import { ensureEnabled, pull, push, ensureSchema } from "./lib/remoteStore.js";
 import { migrateLegacyApplications } from "./lib/applications.js";
+import { seedCommerceDefaults } from "./lib/commerce.js";
 import { db } from "./lib/db.js";
 
 async function syncFromRemote() {
@@ -14,6 +15,9 @@ async function syncFromRemote() {
         users: remote.users || [], members: remote.members || [], parcels: remote.parcels || [],
         resetTokens: remote.resetTokens || [], applications: remote.applications || [],
         messages: remote.messages || [], announcements: remote.announcements || [],
+        warehouses: remote.warehouses || [], packages: remote.packages || [],
+        pricingRules: remote.pricingRules || [], carriers: remote.carriers || [],
+        auditLogs: remote.auditLogs || [], quotes: remote.quotes || [],
       };
       console.log("[remote] loaded " + remote.users.length + " users, " + remote.members.length + " members, " + remote.parcels.length + " parcels from Neon");
     } else if (!db.isEmpty()) {
@@ -36,6 +40,10 @@ async function main() {
 
   // After the remote pull: fold any legacy-file applications into the synced store.
   migrateLegacyApplications();
+
+  // Seed commercial reference data (warehouses, pricing rules, carrier status)
+  // only when missing — admin-managed afterwards.
+  seedCommerceDefaults();
 
   const server = app.listen(config.port, config.host, () => {
     console.log("");

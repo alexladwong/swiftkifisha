@@ -49,7 +49,54 @@ from `POST /api/auth/login`.
 | GET    | /api/shop/world                      | –    | Served countries + member plans (public) |
 | GET    | /api/members?page=&limit=&search=    | 🔒   | Kifisha members with shipment totals |
 | GET    | /api/members/:id                     | 🔒   | Member profile + hub addresses + recent parcels |
+| GET    | /api/members/:id                     | 🔒   | Member profile + hub addresses + recent parcels |
 | GET    | /api/health                          | –    | Liveness check |
+
+### Commercial parcel forwarding (Phase 1 — routes in `src/routes/commerce.routes.js`)
+
+A PACKAGE is an item received at a SwiftKifisha warehouse (a SHIPMENT/parcel is
+the legacy dispatch concept). Statuses/transitions are backend-controlled
+(`src/lib/commerce.js`): member responses carry `allowedActions`, admin
+responses carry `allowedTransitions` — never hard-code the machine in clients.
+Staff status changes, assignment, measurement corrections, receiving, package
+actions, warehouse CRUD and quotes are written to the `auditLogs` collection.
+
+| Method | Path                                    | Auth | Description |
+| ------ | --------------------------------------- | ---- | ----------- |
+| GET    | /api/packages?status=                   | 🔒   | Member's packages (with storage + allowedActions) |
+| GET    | /api/packages/:id                       | 🔒   | Package detail (owner only) |
+| POST   | /api/packages/pre-alert                 | 🔒   | Announce inbound parcel → PRE_ALERTED, id `SWPK-…` |
+| POST   | /api/packages/:id/action                | 🔒   | Member action { action, note } from allowedActions; advisory actions don't move state |
+| GET    | /api/account/overview-stats             | 🔒   | Real counts + action-required reasons for member overview |
+| GET    | /api/mailboxes                          | 🔒   | Member's operational mailbox addresses from admin warehouses |
+| POST   | /api/quotes                             | 🔒   | Quote engine: { warehouseId?, weight, declaredValue, insurance, destinationCountry, … } → `SKQ-…`, line items, 24 h expiry. Estimate, not a guaranteed price |
+| GET    | /api/admin/warehouses                   | 🔒*  | Warehouse list |
+| POST   | /api/admin/warehouses                   | 🔒*  | Create warehouse (name/country/city required) |
+| PATCH  | /api/admin/warehouses/:id               | 🔒*  | Update warehouse (audited) |
+| GET    | /api/admin/packages?status=&search=&unassigned= | 🔒* | Ops queue with filters |
+| POST   | /api/admin/packages/receive             | 🔒*  | Warehouse receiving; header `Idempotency-Key` (or body idempotencyKey); double scans are safe no-ops, pre-alert rows are reused (no twin packages) |
+| POST   | /api/admin/packages/:id/assign          | 🔒*  | Assign package { memberCode } or { email } |
+| PATCH  | /api/admin/packages/:id/measurements    | 🔒*  | Correct weight/dims/condition with reason (audited; volumetric + chargeable recomputed) |
+| POST   | /api/admin/packages/:id/status          | 🔒*  | Staff transition { status, reason } — only from allowedTransitions |
+| POST   | /api/admin/packages/:id/photos          | 🔒*  | multipart `photos` (≤6 × ≤8 MB, JPEG/PNG/WebP/GIF) + `view` (front/back/label/damage/contents) |
+| GET    | /api/files/packages/:filename           | 🔒   | Photo file — package owner or admin only |
+| GET    | /api/admin/audit?limit=                 | 🔒*  | Audit trail (newest first, max 500) |
+
+\* admin/support staff roles (SUPER_ADMIN, ADMIN, OPERATIONS, WAREHOUSE_MANAGER,
+WAREHOUSE_AGENT). Gate is case-insensitive so existing lowercase `admin` users
+qualify.
+
+Commercial notes:
+
+- **Carriers**: `carriers` registry — `SWIFT_INTERNAL` (internal handoff,
+  CONFIGURED) plus DHL/FedEx/Aramex and MTN/Airtel rows. Everything external is
+  `NOT_CONFIGURED` → *Integration prepared — provider credentials required*.
+  The backend never fabricates a successful carrier booking or tracking event.
+- **Payments**: none real. Packages park in `READY_FOR_PAYMENT`; paid checkout
+  is Phase-2 (quote → server-verified payment → shipment creation).
+- **Sync**: these collections are in `SYNC_COLLECTIONS` (warehouses, packages,
+  pricingRules, carriers, auditLogs, quotes). Neon sync is merge-based
+  (`push` upserts; use `removeDocs()` for explicit deletions).
 
 ## International (Kifisha) model
 

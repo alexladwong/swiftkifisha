@@ -12,6 +12,10 @@ import AccountProfile from "./pages/account/ProfileSection";
 import AccountAddresses from "./pages/account/AddressesSection";
 import AccountSecurity from "./pages/account/SecuritySection";
 import AccountNotifications from "./pages/account/NotificationsSection";
+import AccountPackages from "./pages/account/PackagesPage";
+import AccountPackagePreAlert from "./pages/account/PackagePreAlertPage";
+import AccountPackageDetail from "./pages/account/PackageDetailPage";
+import AccountMailboxes from "./pages/account/MailboxesPage";
 import TrackParcel from "./pages/TrackParcel";
 import CalculateCost from "./pages/CalculateCost";
 import About from "./pages/About";
@@ -44,6 +48,10 @@ const App = () => (
           <Route path="addresses" element={<AccountAddresses />} />
           <Route path="security" element={<AccountSecurity />} />
           <Route path="notifications" element={<AccountNotifications />} />
+          <Route path="packages" element={<AccountPackages />} />
+          <Route path="packages/pre-alert" element={<AccountPackagePreAlert />} />
+          <Route path="packages/:id" element={<AccountPackageDetail />} />
+          <Route path="mailboxes" element={<AccountMailboxes />} />
         </Route>
         <Route path="/track" element={<TrackParcel />} />
         <Route path="/calculate" element={<CalculateCost />} />

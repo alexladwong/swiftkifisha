@@ -10,6 +10,7 @@ import memberRoutes from "./routes/members.routes.js";
 import shopRoutes from "./routes/shop.routes.js";
 import membershipRoutes from "./routes/membership.routes.js";
 import notificationRoutes from "./routes/notifications.routes.js";
+import commerceRoutes from "./routes/commerce.routes.js";
 
 const app = express();
 const LANDING = fs.readFileSync(new URL("./landing.html", import.meta.url), "utf8");
@@ -41,7 +42,7 @@ app.use(
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-Idempotency-Key"],
   }),
 );
 app.use(express.json({ limit: "1mb" }));
@@ -67,6 +68,7 @@ app.use("/api/members", memberRoutes);
 app.use("/api/shop", shopRoutes);
 app.use("/api", membershipRoutes);
 app.use("/api", notificationRoutes);
+app.use("/api", commerceRoutes);
 
 // Unknown routes -> always JSON. (Express's built-in HTML error page sets
 // Content-Security-Policy: default-src 'none', which breaks Chrome DevTools
@@ -85,6 +87,15 @@ app.use((err, _req, res, _next) => {
   console.error("[error]", err);
   if (err?.type === "entity.parse.failed") {
     return res.status(400).json({ message: "Invalid JSON in request body." });
+  }
+  if (err?.statusCode) {
+    return res.status(err.statusCode).json({ message: err.message });
+  }
+  if (err?.code === "LIMIT_FILE_SIZE") {
+    return res.status(413).json({ message: "File too large (max 8 MB per file)." });
+  }
+  if (err?.name === "MulterError") {
+    return res.status(400).json({ message: err.message || "Upload rejected." });
   }
   return res.status(500).json({ message: "Internal server error." });
 });

@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { Package, Globe2, Wallet, Clock3, MapPin, ArrowRight } from "lucide-react";
+import {
+  Package, Globe2, Wallet, Clock3, MapPin, ArrowRight, PackageOpen, BellRing, Truck, PackageCheck,
+  TriangleAlert,
+} from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import CopyButton from "@/components/portal/CopyButton";
 import ParcelQR from "@/components/ParcelQR";
-import { fetchMyParcels } from "@/lib/portalApi";
+import { fetchMyParcels, fetchOverviewStats } from "@/lib/portalApi";
 
 const statusOf = (p) => {
   const cps = p?.checkpoints || [];
@@ -17,12 +20,22 @@ export default function Overview() {
   const { user } = useSelector((state) => state.auth);
   const [parcels, setParcels] = useState(null);
   const [error, setError] = useState("");
+  const [stats, setStats] = useState(null);
 
   useEffect(() => {
     let alive = true;
     fetchMyParcels(8)
       .then((res) => alive && setParcels(res))
       .catch(() => alive && setError("Could not load your recent shipments."));
+    return () => { alive = false; };
+  }, []);
+
+  // Packages strip is a nice-to-have: failures degrade silently to "—".
+  useEffect(() => {
+    let alive = true;
+    fetchOverviewStats()
+      .then((s) => alive && setStats(s))
+      .catch(() => { /* silent — the rest of the overview keeps working */ });
     return () => { alive = false; };
   }, []);
 
@@ -86,6 +99,7 @@ export default function Overview() {
             Estimate shipping <ArrowRight className="h-4 w-4" />
           </Link>
           {[
+            { label: "Pre-alert a package", to: "/account/packages/pre-alert" },
             { label: "Track a parcel", to: "/track" },
             { label: "Explore hub countries", to: "/shop-ship" },
             { label: "Contact support", to: "/contact" },
@@ -95,6 +109,105 @@ export default function Overview() {
             </Link>
           ))}
         </div>
+      </section>
+
+      {/* Packages — real counts from the package service */}
+      <section aria-label="Packages overview">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-display text-lg font-bold text-foreground">Packages</h2>
+          <Link to="/account/packages" className="text-[13px] font-semibold text-primary hover:underline">
+            View all packages
+          </Link>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border-[#e5eaf2] bg-white p-[22px]">
+            <p className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-slate-400">
+              <PackageOpen className="h-3.5 w-3.5" /> At warehouse
+            </p>
+            <p className="mt-2 font-display text-[26px] font-extrabold leading-none text-foreground">
+              {stats ? stats.packagesReceived : "—"}
+            </p>
+            <p className="mt-2 text-[12px] text-slate-400">Received parcels waiting at your mailbox</p>
+          </div>
+          <div className="rounded-xl border-[#e5eaf2] bg-white p-[22px]">
+            <p className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-slate-400">
+              <BellRing className="h-3.5 w-3.5" /> Awaiting action
+            </p>
+            <p className={"mt-2 font-display text-[26px] font-extrabold leading-none " + (stats && stats.awaitingAction > 0 ? "text-amber-600" : "text-foreground")}>
+              {stats ? stats.awaitingAction : "—"}
+            </p>
+            <p className="mt-2 text-[12px] text-slate-400">
+              {stats && stats.awaitingAction > 0 ? (
+                <Link to="/account/packages" className="font-semibold text-primary hover:underline">Respond now</Link>
+              ) : (
+                "Nothing waiting for your input"
+              )}
+            </p>
+          </div>
+          <div className="rounded-xl border-[#e5eaf2] bg-white p-[22px]">
+            <p className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-slate-400">
+              <Truck className="h-3.5 w-3.5" /> In transit
+            </p>
+            <p className="mt-2 font-display text-[26px] font-extrabold leading-none text-foreground">
+              {stats && stats.packagesInTransit > 0 ? stats.packagesInTransit : "—"}
+            </p>
+            <p className="mt-2 text-[12px] text-slate-400">Transit tracking follows dispatch</p>
+          </div>
+          <div className="rounded-xl border-[#e5eaf2] bg-white p-[22px]">
+            <p className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-slate-400">
+              <PackageCheck className="h-3.5 w-3.5" /> Delivered
+            </p>
+            <p className="mt-2 font-display text-[26px] font-extrabold leading-none text-foreground">
+              {stats ? stats.delivered : "—"}
+            </p>
+            <p className="mt-2 text-[12px] text-slate-400">Parcels handed over to the courier</p>
+          </div>
+        </div>
+
+        {stats && stats.actionRequired && stats.actionRequired.length > 0 && (
+          <div className="mt-4 rounded-xl border border-amber-200/80 bg-white p-5">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-50">
+                <TriangleAlert className="h-4 w-4 text-amber-500" />
+              </span>
+              <h3 className="font-display text-[15px] font-bold text-foreground">Action required</h3>
+              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[12px] font-bold text-amber-800">
+                {stats.actionRequired.length}
+              </span>
+            </div>
+            <ul className="mt-3 space-y-3">
+              {stats.actionRequired.map((r) => (
+                <li key={r.packageId} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border/70 bg-surface/40 px-4 py-3">
+                  <div className="min-w-0">
+                    <Link
+                      to={"/account/packages/" + r.packageId}
+                      className="font-mono text-[13.5px] font-bold text-primary hover:underline"
+                    >
+                      {r.packageId}
+                    </Link>
+                    {r.reasons && r.reasons.length > 0 && (
+                      <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        {r.reasons.map((reason) => (
+                          <span key={reason} className="inline-flex items-center gap-1.5 text-[13px] text-slate-600">
+                            <span className="h-1 w-1 rounded-full bg-amber-400" aria-hidden="true" />
+                            {reason}
+                          </span>
+                        ))}
+                      </p>
+                    )}
+                  </div>
+                  <Link
+                    to={"/account/packages/" + r.packageId}
+                    className="inline-flex items-center gap-1 text-[13px] font-bold text-primary hover:underline"
+                  >
+                    Review <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
 
       {/* Recent shipments */}

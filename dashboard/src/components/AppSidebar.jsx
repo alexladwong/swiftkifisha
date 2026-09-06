@@ -12,6 +12,9 @@ import {
   ClipboardCheck,
   Inbox,
   Megaphone,
+  Warehouse,
+  PackageCheck,
+  PackageSearch,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
@@ -35,6 +38,9 @@ const mainItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Create Parcel", url: "/create-parcel", icon: PackagePlus },
   { title: "Manage Parcels", url: "/manage-parcels", icon: Boxes },
+  { title: "Warehouses", url: "/warehouses", icon: Warehouse },
+  { title: "Receiving", url: "/receiving", icon: PackageCheck },
+  { title: "Packages", url: "/packages", icon: PackageSearch },
   { title: "Kifisha Members", url: "/members", icon: Users },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Parcel Tracking", url: "/tracking", icon: Search },
