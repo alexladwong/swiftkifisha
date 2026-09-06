@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
   Package, Mail, Phone, Globe2, MapPin, Lock, Radio, Wallet, ShieldCheck,
-  ArrowRight, ChevronDown, ExternalLink,
+  ArrowRight, ChevronDown, ExternalLink, Play, Apple,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AuthDialog from "@/components/AuthDialog";
@@ -274,6 +274,42 @@ export default function Footer() {
                 <span className="text-[14px] font-medium text-white/70">{t(item.labelKey)}</span>
               </div>
             ))}
+          </div>
+
+          {/* Download our app */}
+          <div className="flex flex-col gap-5 border-t border-white/10 py-8 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="font-display text-lg font-bold text-white">{t("footer.appTitle")}</h2>
+              <p className="mt-1 max-w-md text-[14px] leading-relaxed text-white/55">{t("footer.appSubtitle")}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <a
+                href="https://play.google.com/store/search?q=SwiftKifisha&c=apps"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t("footer.appPlayAria")}
+                className="inline-flex h-12 items-center gap-2.5 rounded-xl border border-white/15 bg-white/[0.05] px-4 text-white transition-colors hover:border-accent/60 hover:bg-white/[0.09]"
+              >
+                <Play className="h-5 w-5 text-accent" fill="currentColor" aria-hidden="true" />
+                <span className="text-left leading-tight">
+                  <span className="block text-[10px] uppercase tracking-wider text-white/50">{t("footer.appGetOn")}</span>
+                  <span className="block text-[15px] font-bold">{t("footer.appGooglePlay")}</span>
+                </span>
+              </a>
+              <a
+                href="https://apps.apple.com/search?term=SwiftKifisha"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t("footer.appStoreAria")}
+                className="inline-flex h-12 items-center gap-2.5 rounded-xl border border-white/15 bg-white/[0.05] px-4 text-white transition-colors hover:border-accent/60 hover:bg-white/[0.09]"
+              >
+                <Apple className="h-5 w-5 text-accent" aria-hidden="true" />
+                <span className="text-left leading-tight">
+                  <span className="block text-[10px] uppercase tracking-wider text-white/50">{t("footer.appGetOn")}</span>
+                  <span className="block text-[15px] font-bold">{t("footer.appAppStore")}</span>
+                </span>
+              </a>
+            </div>
           </div>
 
           {/* Bottom utility bar */}

@@ -135,8 +135,8 @@ export async function initiateStkPush({ phoneNumber, amount, accountReference, t
     throw new Error("M-Pesa authorization failed on STK push — try again.");
   }
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`M-Pesa STK push failed (HTTP ${res.status}).`);
+    const text = (await res.text().catch(() => "")).replace(/[^ -~]/g, "").slice(0, 240);
+    throw new Error(`M-Pesa STK push failed (HTTP ${res.status})${text ? ` — ${text}` : ""}.`);
   }
   const body = await res.json().catch(() => ({}));
   return {

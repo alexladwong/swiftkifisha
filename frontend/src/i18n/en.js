@@ -64,6 +64,13 @@ export default {
   },
 
   footer: {
+      appTitle: "Download our app",
+      appSubtitle: "Track parcels, top up your wallet and ship from anywhere — right from your phone.",
+      appGetOn: "Get it on",
+      appGooglePlay: "Google Play",
+      appAppStore: "App Store",
+      appPlayAria: "Open Google Play search for SwiftKifisha",
+      appStoreAria: "Open App Store search for SwiftKifisha",
     tagline:
       "One membership, mailboxes around the world. We receive your online orders, consolidate them and deliver to your door in 50+ countries — with transparent fees and live tracking.",
     kampala: "Kampala, Uganda",

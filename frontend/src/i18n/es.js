@@ -63,6 +63,13 @@ export default {
   },
 
   footer: {
+      appTitle: "Descarga nuestra app",
+      appSubtitle: "Rastrea paquetes, recarga tu billetera y envía desde cualquier lugar, directamente desde tu teléfono.",
+      appGetOn: "Disponible en",
+      appGooglePlay: "Google Play",
+      appAppStore: "App Store",
+      appPlayAria: "Abrir la búsqueda de SwiftKifisha en Google Play",
+      appStoreAria: "Abrir la búsqueda de SwiftKifisha en el App Store",
     tagline:
       "Una sola membresía, buzones en todo el mundo. Recibimos tus pedidos online, los consolidamos y te los entregamos en tu puerta en más de 50 países, con tarifas transparentes y seguimiento en tiempo real.",
     kampala: "Kampala, Uganda",

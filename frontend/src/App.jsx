@@ -17,6 +17,7 @@ import AccountPackagePreAlert from "./pages/account/PackagePreAlertPage";
 import AccountPackageDetail from "./pages/account/PackageDetailPage";
 import AccountMailboxes from "./pages/account/MailboxesPage";
 import AccountBilling from "./pages/account/BillingPage";
+import AccountInternational from "./pages/account/InternationalPage";
 import AccountInvoiceDetail from "./pages/account/InvoiceDetailPage";
 import AccountCheckout from "./pages/account/CheckoutPage";
 import TrackParcel from "./pages/TrackParcel";
@@ -55,6 +56,7 @@ const App = () => (
           <Route path="packages/pre-alert" element={<AccountPackagePreAlert />} />
           <Route path="packages/:id" element={<AccountPackageDetail />} />
           <Route path="mailboxes" element={<AccountMailboxes />} />
+          <Route path="international" element={<AccountInternational />} />
           <Route path="billing" element={<AccountBilling />} />
           <Route path="invoices/:id" element={<AccountInvoiceDetail />} />
           <Route path="checkout" element={<AccountCheckout />} />

@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   ArrowLeft, ArrowRight, RefreshCw, Loader2, Camera, Store, Ruler, TriangleAlert, CalendarDays, ChevronRight,
-  Ship, Combine, Boxes, CirclePause, Undo2, Trash2, PackageSearch, PackageX, ImageOff, Info, FileText,
+  Ship, Combine, Boxes, CirclePause, Undo2, Trash2, PackageSearch, PackageX, ImageOff, Info, FileText, Globe2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -658,6 +658,23 @@ export default function PackageDetailPage() {
               <p className="mt-4 text-sm text-muted-foreground">
                 No actions are available for this package right now.
               </p>
+            )}
+
+            {/* Additive shortcut: the backend allows the consolidate action for this status
+                (RECEIVED/PROCESSING/ACTION_REQUIRED/READY_TO_SHIP/REPACKING) and the parcel is
+                not part of a completed consolidation yet — point at the multi-package flow. */}
+            {(pkg.allowedActions || []).includes("consolidate") && !pkg.consolidationId && (
+              <div className="mt-4 border-t border-border/60 pt-3">
+                <p className="text-[12px] leading-relaxed text-slate-500">
+                  Combine this parcel with others into one shipment and save on per-parcel costs.
+                </p>
+                <Link
+                  to="/account/international"
+                  className="mt-1 inline-flex items-center gap-1.5 text-[13px] font-bold text-primary transition-colors hover:text-primary/80 hover:underline"
+                >
+                  <Globe2 className="h-4 w-4" /> Consolidate packages <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
             )}
 
             {(!pkg.allowedActions || pkg.allowedActions.length === 0) && pkg.status === "READY_FOR_PAYMENT" && (

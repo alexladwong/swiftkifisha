@@ -63,6 +63,13 @@ export default {
   },
 
   footer: {
+      appTitle: "下载我们的应用",
+      appSubtitle: "随时随地通过手机跟踪包裹、充值钱包并发货。",
+      appGetOn: "在以下平台获取",
+      appGooglePlay: "Google Play",
+      appAppStore: "App Store",
+      appPlayAria: "打开 Google Play 上的 SwiftKifisha 搜索",
+      appStoreAria: "打开 App Store 上的 SwiftKifisha 搜索",
     tagline:
       "一份会员，畅享全球邮箱。我们为您代收网购订单、合并装箱并送货上门，覆盖 50+ 个国家——费用透明，全程实时追踪。",
     kampala: "Kampala, Uganda",

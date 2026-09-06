@@ -224,3 +224,35 @@ export const refreshPayment = async (idOrPaymentId) => {
   const { data } = await axiosInstance.post(`/payments/${idOrPaymentId}/refresh`, {}, { headers: auth() });
   return data; // { paymentId, status, message }
 };
+
+/* ------------------------- international: consolidations & customs ------------------------- */
+
+/** GET /api/consolidations — my consolidation requests (newest first). */
+export const fetchMyConsolidations = async () => {
+  const { data } = await axiosInstance.get("/consolidations", { headers: auth() });
+  return data.consolidations || [];
+};
+
+/** POST /api/consolidations { packageIds: [2+], note?, repack? } → 201 { message, consolidation }. */
+export const createConsolidation = async (payload) => {
+  const { data } = await axiosInstance.post("/consolidations", payload, { headers: auth() });
+  return data; // the API may answer 400/403/409 with { message } — show it verbatim
+};
+
+/** GET /api/customs/me — my customs declarations (newest first). */
+export const fetchMyDeclarations = async () => {
+  const { data } = await axiosInstance.get("/customs/me", { headers: auth() });
+  return data.declarations || [];
+};
+
+/** POST /api/customs { packageIds: [1+], purpose, currency?, items } → 201 { message, declaration }. */
+export const createCustomsDeclaration = async (payload) => {
+  const { data } = await axiosInstance.post("/customs", payload, { headers: auth() });
+  return data; // the API may answer 400/403/409 with { message } — show it verbatim
+};
+
+/** GET /api/restricted/categories — advisory list of restricted/prohibited item categories. */
+export const fetchRestrictedCategories = async () => {
+  const { data } = await axiosInstance.get("/restricted/categories", { headers: auth() });
+  return data; // { categories: [{ code, label, note }], note }
+};

@@ -24,6 +24,7 @@ import AnnouncementsPage from "@/pages/Announcements";
 import Warehouses from "@/pages/Warehouses";
 import Receiving from "@/pages/Receiving";
 import WarehousePackages from "@/pages/WarehousePackages";
+import International from "@/pages/International";
 import Payments from "@/pages/Payments";
 import Invoices from "@/pages/Invoices";
 import Shipments from "@/pages/Shipments";
@@ -47,6 +48,7 @@ const App = () => (
             <Route path="/warehouses" element={<Warehouses />} />
             <Route path="/receiving" element={<Receiving />} />
             <Route path="/packages" element={<WarehousePackages />} />
+            <Route path="/international" element={<International />} />
             <Route path="/payments" element={<Payments />} />
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/shipments" element={<Shipments />} />

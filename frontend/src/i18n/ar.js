@@ -64,6 +64,13 @@ export default {
   },
 
   footer: {
+      appTitle: "حمّل تطبيقنا",
+      appSubtitle: "تتبّع طرودك، وعبّئ محفظتك، واشحن من أي مكان — مباشرة من هاتفك.",
+      appGetOn: "احصل عليه على",
+      appGooglePlay: "Google Play",
+      appAppStore: "App Store",
+      appPlayAria: "افتح بحث SwiftKifisha على Google Play",
+      appStoreAria: "افتح بحث SwiftKifisha على App Store",
     tagline:
       "عضوية واحدة، وصناديق بريدية حول العالم. نستلم طلباتك عبر الإنترنت، ونجمعها، ونوصلها إلى باب منزلك في أكثر من 50 دولة — برسوم شفافة وتتبع مباشر.",
     kampala: "Kampala, Uganda",
