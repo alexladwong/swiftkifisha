@@ -299,3 +299,34 @@ Final status (this session):
   like an RSA blob; Daraja OAuth normally expects the plain portal secret).
   Everything downstream is implemented and will activate without code changes
   once the correct secret/environment/shortcode/callback URL are configured.
+
+
+---
+
+# Phase 3 slice A (international) — backend implemented & verified
+
+New `backend/src/routes/international.routes.js` + collections `declarations`,
+`consolidations` (wired into db defaults, Neon SYNC_COLLECTIONS and the boot
+pull mapper):
+
+- **Customs declarations**: member `POST /api/customs` (own packages,
+  purpose ∈ personal|gift|sale|documents|return, per-item description/qty/unit
+  value/country of origin/HS code — positives enforced, total computed
+  server-side), `GET /api/customs/me`, `GET /api/customs/:id`; admin
+  `GET /api/admin/customs` (status + flagged filters),
+  `POST /api/admin/customs/:id/review` (approve | flag | more_info with reason,
+  audited, member emailed). No undervaluation nudges; `SKD-…` ids.
+- **Consolidation**: member `POST /api/consolidations` (≥2 own eligible
+  packages; open-request guard 409; packages → CONSOLIDATION_PENDING),
+  `GET /api/consolidations`; admin accept → IN_PROGRESS, complete (warehouse
+  records combined weight/dims → volumetric + chargeable recomputed, packages
+  → CONSOLIDATED, email), cancel (restores each package's prior status).
+  `SKC-…` ids; every step audited.
+- **Restricted items**: `GET /api/restricted/categories` — advisory list of 10
+  categories with the explicit caveat that exact restrictions vary by
+  origin/destination/carrier (no invented legality).
+- Live curl E2E: declaration OK + invalid-item 400 + admin FLAG → flagged
+  queue; consolidation request + duplicate 409 + accept + complete
+  (0.9 kg / 25×18×6 → volumetric 0.54, chargeable 0.9) → packages
+  CONSOLIDATED; audit trail shows every action. Dev fixture
+  `phase1.dev@example.com` recreated after the environment pruned it.

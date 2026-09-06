@@ -429,7 +429,7 @@ router.get("/sign-in/social", ah(async (req, res) => {
   if (!/^https?:\/\//.test(callbackURL)) {
     return res.status(400).json({ message: "A valid callback URL is required." });
   }
-  const redirectURI = googleRedirectURI(req);
+  const redirectURI = googleRedirectURI(req, callbackURL);
   const state = googleStateToken(callbackURL);
   return res.redirect(googleAuthURL({ clientId: g.clientId, redirectURI, state }));
 }));
@@ -454,7 +454,7 @@ router.get("/callback/google", ah(async (req, res) => {
     return res.status(400).json({ message: "Invalid sign-in state. Please try again." });
   }
   const g = googleConfig();
-  const redirectURI = googleRedirectURI(req);
+  const redirectURI = googleRedirectURI(req, callbackURL);
 
   let profile;
   try {

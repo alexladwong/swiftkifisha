@@ -154,7 +154,7 @@ router.post("/packages/:id/action", requireAuth, ah(async (req, res) => {
 }));
 
 /** GET /api/account/overview-stats — real counts for the member Overview. */
-router.get("/account/overview-stats", requireAuth, ah(async (req, res) => {
+const overviewStatsHandler = ah(async (req, res) => {
   const user = memberByToken(req);
   const mine = (db.data.packages || []).filter((p) => p.customerEmail === user.email);
   const awaiting = mine.filter((p) => p.status === "ACTION_REQUIRED" || p.status === "RECEIVED" || p.status === "PROCESSING");
@@ -177,7 +177,9 @@ router.get("/account/overview-stats", requireAuth, ah(async (req, res) => {
     delivered: 0,
     actionRequired,
   });
-}));
+});
+router.get("/account/overview-stats", requireAuth, overviewStatsHandler);
+router.get("/account/overview", requireAuth, overviewStatsHandler); // alias
 
 /** GET /api/mailboxes — operational mailbox info (admin-managed warehouses). */
 router.get("/mailboxes", requireAuth, ah(async (req, res) => {

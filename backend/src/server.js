@@ -21,6 +21,7 @@ async function syncFromRemote() {
         invoices: remote.invoices || [], payments: remote.payments || [],
         ledger: remote.ledger || [], shipments: remote.shipments || [],
         settings: remote.settings || [], points: remote.points || [],
+        declarations: remote.declarations || [], consolidations: remote.consolidations || [],
       };
       console.log("[remote] loaded " + remote.users.length + " users, " + remote.members.length + " members, " + remote.parcels.length + " parcels from Neon");
     } else if (!db.isEmpty()) {

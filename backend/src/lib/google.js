@@ -26,29 +26,40 @@ export function googleConfig() {
 }
 
 /**
- * The backend OWNS the OAuth callback: the redirect URI is always
- * <api origin> + /api/auth/callback/google — never derived from the
- * browser's window.location.
+ * The backend OWNS the OAuth callback. The redirect URI must be one the
+ * Google console actually registers. Registered set (client 702921110092-…):
+ *   http://localhost:5173/api/auth/callback/google        (member dev, via Vite)
+ *   http://localhost:5174/api/auth/callback/google        (dashboard dev)
+ *   https://swiftkifisha.vercel.app/api/auth/callback/google
+ *   https://api.eazyjobs.info/api/auth/callback/google
+ *   https://precise-pig-300.convex.site/api/auth/callback/google
+ * Every registered URI is a FRONTEND/API origin whose /api path reaches this
+ * Express backend (Vite proxy locally, rewrite/proxy in production), so we
+ * emit <frontend origin>/api/auth/callback/google from the signed callbackURL
+ * the app itself supplied — seamless offline and online, zero console edits.
  *
  * Origin resolution order:
- *   1. PUBLIC_API_URL (explicit; set on the production host, e.g.
- *      https://api.eazyjobs.info)
- *   2. The request's X-Forwarded-Host / X-Forwarded-Proto (reverse proxies:
- *      Caddy, nginx) — this keeps Google sign-in working on hosts whose env
- *      does not (yet) set PUBLIC_API_URL.
- *   3. The plain Host header (direct access, e.g. localhost dev).
+ *   1. PUBLIC_API_URL (explicit override, e.g. api.eazyjobs.info host).
+ *   2. The signed callbackURL origin (frontend app origin) — registered.
+ *   3. X-Forwarded-Host / X-Forwarded-Proto (direct reverse proxies).
+ *   4. The plain Host header.
  *
- * Google only honors redirect URIs registered in the OAuth console, so a
- * host-derived URI cannot be abused for redirect attacks.
+ * Safe by construction: callbackURL rides inside our own signed state, and
+ * Google only redirects to console-registered URIs anyway.
  */
-export function googleRedirectURI(req) {
+export function googleRedirectURI(req, callbackURL) {
   let base = (process.env.PUBLIC_API_URL || "").replace(/\/+$/, "");
+  if (!base && typeof callbackURL === "string" && /^https?:\/\//.test(callbackURL)) {
+    try {
+      base = new URL(callbackURL).origin.replace(/\/+$/, "");
+    } catch { /* fall through */ }
+  }
   if (!base && req) {
     const proto = String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim().toLowerCase() || (req.socket?.encrypted ? "https" : "http");
     const host = String(req.headers["x-forwarded-host"] || "").split(",")[0].trim().toLowerCase() || String(req.headers.host || "").toLowerCase();
     if (/^[a-z0-9.-]+(:\d+)?$/.test(host)) base = `${proto}://${host}`;
   }
-  if (!base) base = "http://localhost:5001";
+  if (!base) base = "http://localhost:5173";
   return base.replace(/\/+$/, "") + "/api/auth/callback/google";
 }
 
