@@ -260,24 +260,33 @@ function PaymentConfigCard() {
   const [cfg, setCfg] = useState({ loading: true, error: "", config: null, providers: [] });
   const [draft, setDraft] = useState("");
   const [enabled, setEnabled] = useState(true);
-  const [momo, setMomo] = useState({ enabled: false, number: "", networkLabel: "", ussdTemplate: "" });
+  const [momo, setMomo] = useState({
+    enabled: false, network: "MTN", networkLabel: "", ussdTemplate: "",
+    dialTemplate: "", number: "", maskedNumber: "", revealed: false, revealBusy: false,
+  });
   const [chanEnabled, setChanEnabled] = useState({});
   const [busy, setBusy] = useState(false);
   const [momoBusy, setMomoBusy] = useState(false);
   const [chanBusy, setChanBusy] = useState(null);
 
   /** Mirror a config payload into the form and the channel/provider state. */
-  const syncFrom = (config, providers) => {
+  const syncFrom = (config, providers, momoTop) => {
     const offline = config?.offline || {};
     const m = config?.momo || {};
+    const mt = momoTop || {};
     const chans = config?.channels || {};
     setDraft(offline.instructions || "");
     setEnabled(!!offline.enabled);
     setMomo({
-      enabled: !!m.enabled,
-      number: m.number || "",
-      networkLabel: m.networkLabel || "",
-      ussdTemplate: m.ussdTemplate || "",
+      enabled: !!mt.enabled,
+      network: mt.network || "MTN",
+      networkLabel: mt.networkLabel || m.networkLabel || "",
+      ussdTemplate: mt.ussdTemplate || m.ussdTemplate || "",
+      dialTemplate: mt.dialTemplate || "",
+      number: mt.number || "", // present only after a finance reveal
+      maskedNumber: mt.maskedNumber || m.maskedNumber || "",
+      revealed: Boolean(mt.number),
+      revealBusy: false,
     });
     setChanEnabled(Object.fromEntries(Object.keys(chans).map((code) => [code, !!chans[code]?.enabled])));
     setCfg({ loading: false, error: "", config: config || null, providers: providers || [] });
@@ -287,7 +296,7 @@ function PaymentConfigCard() {
     setCfg((s) => ({ ...s, loading: !s.config, error: "" }));
     try {
       const { data } = await axiosInstance.get("/admin/payment-config");
-      syncFrom(data.config, data.providers);
+      syncFrom(data.config, data.providers, data.momo);
     } catch (err) {
       setCfg((s) => ({
         ...s,
@@ -310,7 +319,7 @@ function PaymentConfigCard() {
         offline: { enabled, instructions: draft.trim() },
       });
       toast.success(data?.message || "Payment instructions saved.");
-      syncFrom(data.config, data.providers);
+      syncFrom(data.config, data.providers, data.momo);
     } catch (err) {
       toast.error(err?.response?.data?.message || "Could not save payment instructions.");
     } finally {
@@ -318,27 +327,76 @@ function PaymentConfigCard() {
     }
   };
 
+  const NETWORK_PRESETS = {
+    MTN: { label: "MTN Mobile Money (Uganda)", public: "*165*1*{amount}#", dial: "*165*1*{amount}*{number}#" },
+    AIRTEL: { label: "Airtel Money (Uganda)", public: "*185*1*1*{amount}#", dial: "*185*1*1*{amount}*{number}#" },
+  };
+  const applyNetwork = (code) => {
+    const preset = NETWORK_PRESETS[code];
+    if (!preset) return;
+    setMomo((d) => ({ ...d, network: code, networkLabel: preset.label, ussdTemplate: preset.public, dialTemplate: preset.dial }));
+  };
+  /** Finance reveal — fetches the settlement number + private dial template once. */
+  const revealMomo = async () => {
+    setMomo((d) => ({ ...d, revealBusy: true }));
+    try {
+      const { data } = await axiosInstance.get("/admin/payment-config", { params: { reveal: "true" } });
+      setMomo((d) => ({
+        ...d,
+        number: data?.momo?.number || d.number,
+        dialTemplate: data?.momo?.dialTemplate || d.dialTemplate,
+        maskedNumber: data?.momo?.maskedNumber || d.maskedNumber,
+        revealed: Boolean(data?.momo?.number),
+        revealBusy: false,
+      }));
+    } catch {
+      setMomo((d) => ({ ...d, revealBusy: false }));
+      toast.error("Reveal requires an authorized finance session.");
+    }
+  };
+
+  /** Finance: run the real Daraja OAuth connectivity test (no charges). */
+  const [testBusy, setTestBusy] = useState(false);
+  const testMpesa = async () => {
+    setTestBusy(true);
+    try {
+      const { data } = await axiosInstance.post("/admin/providers/mpesa/test-connection");
+      const lines = (data?.results || [])
+        .map((r) => `${r.env}: ${r.ok ? "OK" : `failed (HTTP ${r.httpStatus ?? "?"}) — ${String(r.reason || "").slice(0, 90)}`}`)
+        .join(" · ");
+      toast.success(`M-Pesa test — ${lines}`);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "M-Pesa test failed.");
+    } finally {
+      setTestBusy(false);
+    }
+  };
+
   /** Persist the manual mobile-money settings (switch + fields in one save). */
   const saveMomo = async (e) => {
     e.preventDefault();
-    if (momo.enabled && !momo.number.trim()) {
-      toast.error("Receive number is required when mobile money is on.");
+    if (momo.enabled && !momo.revealed) {
+      toast.error("Reveal the settlement number first (finance only) before saving while mobile money is on.");
       return;
     }
     setMomoBusy(true);
     try {
-      const { data } = await axiosInstance.put("/admin/payment-config", {
-        momo: {
-          enabled: momo.enabled,
-          number: momo.number.trim(),
-          networkLabel: momo.networkLabel.trim(),
-          ussdTemplate: momo.ussdTemplate.trim(),
-        },
-      });
+      const payload = {
+        enabled: momo.enabled,
+        network: momo.network || "MTN",
+        networkLabel: momo.networkLabel.trim() || (NETWORK_PRESETS[momo.network]?.label || "Mobile money"),
+        ussdTemplate: momo.ussdTemplate.trim(),
+      };
+      if (momo.revealed) {
+        payload.number = momo.number.trim();
+        if (momo.dialTemplate.trim()) payload.dialTemplate = momo.dialTemplate.trim();
+      }
+      const { data } = await axiosInstance.put("/admin/payment-config", { momo: payload });
       toast.success(data?.message || "Mobile money settings saved.");
-      syncFrom(data.config, data.providers);
+      syncFrom(data.config, data.providers, data.momo);
     } catch (err) {
       toast.error(err?.response?.data?.message || "Could not save mobile money settings.");
+      load();
     } finally {
       setMomoBusy(false);
     }
@@ -352,7 +410,7 @@ function PaymentConfigCard() {
         channels: { [code]: { enabled: value } },
       });
       toast.success(data?.message || "Channel updated.");
-      syncFrom(data.config, data.providers);
+      syncFrom(data.config, data.providers, data.momo);
     } catch (err) {
       toast.error(err?.response?.data?.message || "Could not update the channel.");
       load();
@@ -368,9 +426,9 @@ function PaymentConfigCard() {
   const memberOffline = cfg.config?.offline || {};
   const memberMomo = cfg.config?.momo || {};
 
-  // Live preview of the USSD template ({amount} → 50000, {number} → receive number).
+  // Public customer preview ({amount} → 50000). Never includes the number.
   const momoPreview = momo.ussdTemplate
-    ? momo.ussdTemplate.replace(/\{amount\}/g, "50000").replace(/\{number\}/g, momo.number.trim() || "…")
+    ? momo.ussdTemplate.replace(/\{amount\}/g, "50000").replace(/\{number\}/g, "")
     : "—";
 
   return (
@@ -412,10 +470,8 @@ function PaymentConfigCard() {
                   <MemberChip on={!!memberOffline.enabled} />
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                  <span className="min-w-0 flex-1 text-sm">
-                    <span className="truncate">{memberMomo.networkLabel || "Mobile money (manual)"}</span>
-                    <span className="text-muted-foreground"> · pay to </span>
-                    <span className="font-mono text-xs">{memberMomo.number || "…"}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm">
+                    {memberMomo.networkLabel || "Mobile money (manual)"}
                   </span>
                   <MemberChip on={!!memberMomo.enabled} />
                 </div>
@@ -462,8 +518,9 @@ function PaymentConfigCard() {
                 <div className="min-w-0">
                   <p className="text-sm font-semibold">Mobile money (manual)</p>
                   <p className="text-xs text-muted-foreground">
-                    When on, members see this option when topping up their wallet and pay the receive number
-                    below. Top-ups arrive in this queue as Top-up payments for verification.
+                    When on, members see this option when topping up their wallet and pay with the QR/USSD shown
+                    for their exact amount. Settlements arrive in this queue as Top-up payments for verification.
+                    The receive number is private: it is only embedded server-side into the payment QR/dial.
                   </p>
                 </div>
                 <Switch
@@ -481,22 +538,22 @@ function PaymentConfigCard() {
                 <div className="space-y-3">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-1.5">
-                      <Label htmlFor="momo-number">Receive number</Label>
-                      <Input
-                        id="momo-number"
-                        className="h-9 font-mono text-sm"
-                        placeholder="+256757889291"
-                        value={momo.number}
-                        onChange={(e) => setMomo((d) => ({ ...d, number: e.target.value }))}
-                        maxLength={32}
-                      />
+                      <Label>Network</Label>
+                      <select
+                        value={momo.network || "MTN"}
+                        onChange={(e) => applyNetwork(e.target.value)}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      >
+                        <option value="MTN">MTN Mobile Money (Uganda)</option>
+                        <option value="AIRTEL">Airtel Money (Uganda)</option>
+                      </select>
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="momo-label">Network label</Label>
                       <Input
                         id="momo-label"
                         className="h-9 text-sm"
-                        placeholder="MTN MoMo (Uganda)"
+                        placeholder="MTN Mobile Money (Uganda)"
                         value={momo.networkLabel}
                         onChange={(e) => setMomo((d) => ({ ...d, networkLabel: e.target.value }))}
                         maxLength={80}
@@ -504,20 +561,74 @@ function PaymentConfigCard() {
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="momo-ussd">USSD template</Label>
+                    <Label htmlFor="momo-ussd">Public USSD template (customer-facing)</Label>
                     <Input
                       id="momo-ussd"
                       className="h-9 font-mono text-sm"
-                      placeholder="*165*1*{amount}*{number}#"
+                      placeholder="*165*1*{amount}#"
                       value={momo.ussdTemplate}
                       onChange={(e) => setMomo((d) => ({ ...d, ussdTemplate: e.target.value }))}
                       maxLength={120}
                     />
-                    <p className="break-all text-xs text-muted-foreground">
-                      Member QR/USSD: <span className="font-mono text-foreground">{momoPreview}</span>
-                    </p>
                     <p className="text-[11px] text-muted-foreground">
-                      {"{amount}"} previews as 50000 and {"{number}"} as the receive number shown to members.
+                      Use {"{amount}"} only — the backend rejects templates that embed the receive number.
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Private settlement configuration (finance only)
+                    </p>
+                    {!momo.revealed ? (
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-mono text-sm text-slate-500">{momo.maskedNumber || "Number masked"}</p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={revealMomo}
+                          disabled={momo.revealBusy}
+                          className="h-8"
+                        >
+                          {momo.revealBusy && <LoaderCircle className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                          Reveal
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="momo-number">Settlement number (revealed)</Label>
+                          <Input
+                            id="momo-number"
+                            className="h-9 font-mono text-sm"
+                            value={momo.number}
+                            onChange={(e) => setMomo((d) => ({ ...d, number: e.target.value }))}
+                            maxLength={32}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="momo-dial">Private dial template (server-side only)</Label>
+                          <Input
+                            id="momo-dial"
+                            className="h-9 font-mono text-sm"
+                            placeholder="*165*1*{amount}*{number}#"
+                            value={momo.dialTemplate}
+                            onChange={(e) => setMomo((d) => ({ ...d, dialTemplate: e.target.value }))}
+                            maxLength={160}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Customer preview (public — never shows settlement data)
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">Amount: 50,000 UGX</p>
+                    <p className="mt-0.5 font-mono text-sm text-foreground">{momoPreview}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Members see a QR for this code plus a Pay-on-phone button; both are generated server-side.
                     </p>
                   </div>
                 </div>
@@ -550,9 +661,47 @@ function PaymentConfigCard() {
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium">
                             {pr.label || PROVIDER_LABEL[pr.code] || pr.code}
+                            {pr.configured && pr.code === "MPESA" && (
+                              <span className="ml-2 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                                Connected
+                              </span>
+                            )}
                           </p>
                           <p className="font-mono text-[11px] text-muted-foreground">{pr.code}</p>
-                          {!ready && pr.message && (
+                          {pr.code === "MPESA" && (
+                            <div className="mt-1 space-y-0.5 text-[11.5px] text-muted-foreground">
+                              <p>
+                                Environment: <span className="font-semibold text-foreground">{pr.env || "Sandbox"}</span>
+                                {pr.shortcodeMasked ? (
+                                  <>
+                                    {" · Shortcode: "}
+                                    <span className="font-mono">{pr.shortcodeMasked}</span>
+                                  </>
+                                ) : (
+                                  <span className="text-amber-600"> · Shortcode not set</span>
+                                )}
+                                {" · Callback: "}
+                                {pr.callbackConfigured ? (
+                                  <span className="font-semibold text-emerald-600">configured</span>
+                                ) : (
+                                  <span className="text-amber-600">not set</span>
+                                )}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={testMpesa}
+                                disabled={testBusy}
+                                className="inline-flex items-center gap-1 font-bold text-primary hover:underline disabled:opacity-60"
+                              >
+                                {testBusy && <LoaderCircle className="h-3 w-3 animate-spin" />}
+                                Test connection (OAuth, no charges)
+                              </button>
+                            </div>
+                          )}
+                          {!ready && pr.message && pr.code !== "MPESA" && (
+                            <p className="mt-0.5 text-xs text-muted-foreground">{pr.message}</p>
+                          )}
+                          {pr.code === "MPESA" && !pr.configured && (
                             <p className="mt-0.5 text-xs text-muted-foreground">{pr.message}</p>
                           )}
                         </div>
@@ -617,6 +766,36 @@ export default function Payments() {
   const [rejectReason, setRejectReason] = useState("");
   const [rejectError, setRejectError] = useState("");
   const [rejectBusy, setRejectBusy] = useState(false);
+
+  // Member-submitted proof screenshot viewer (finance only).
+  const [proofTarget, setProofTarget] = useState(null); // payment
+  const [proofUrl, setProofUrl] = useState("");
+  const [proofBusy, setProofBusy] = useState(false);
+
+  const openProof = async (p) => {
+    setProofTarget(p);
+    setProofUrl("");
+    setProofBusy(true);
+    try {
+      const file = p.submission?.screenshotFile;
+      if (!file) return;
+      const { data } = await axiosInstance.get(`/admin/payments/${p._id}/screenshot/${encodeURIComponent(file)}`, {
+        responseType: "blob",
+      });
+      setProofUrl(URL.createObjectURL(data));
+    } catch {
+      setProofTarget(null);
+    } finally {
+      setProofBusy(false);
+    }
+  };
+  const closeProof = () => {
+    setProofTarget(null);
+    setProofUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return "";
+    });
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -857,16 +1036,48 @@ export default function Payments() {
                       </TableCell>
                       <TableCell className="hidden xl:table-cell">
                         <div className="min-w-0">
-                          <p className="font-mono text-xs">{p.reference || "—"}</p>
+                          <p className="font-mono text-xs">{p.submission?.reference || p.reference || "—"}</p>
+                          {p.status === "PAYMENT_SUBMITTED" && p.submission?.submittedAt && (
+                            <p className="truncate text-[11px] text-muted-foreground">
+                              submitted {fmtDate(p.submission.submittedAt)}
+                              {p.submission?.screenshotFile ? (
+                                <>
+                                  {" · "}
+                                  <button
+                                    type="button"
+                                    onClick={() => openProof(p)}
+                                    className="font-bold text-primary hover:underline"
+                                  >
+                                    proof
+                                  </button>
+                                </>
+                              ) : null}
+                            </p>
+                          )}
                           {p.status === "PAID" && (
                             <p className="truncate text-[11px] text-muted-foreground">
                               {p.verifiedBy ? `Verified by ${p.verifiedBy}` : "Verified"}
                             </p>
                           )}
+                          {p.status === "REJECTED" && p.rejectReason && (
+                            <p className="truncate text-[11px] font-semibold text-destructive">{p.rejectReason}</p>
+                          )}
+                          {p.provider === "MPESA" && (
+                            <div className="mt-1 space-y-0.5 font-mono text-[10.5px] text-muted-foreground">
+                              {p.checkoutRequestId && <p title={p.checkoutRequestId}>Checkout: {p.checkoutRequestId.slice(0, 14)}…</p>}
+                              {p.merchantRequestId && <p title={p.merchantRequestId}>Merchant: {p.merchantRequestId.slice(0, 14)}…</p>}
+                              {p.providerReceipt && <p className="text-emerald-700">Receipt: {p.providerReceipt}</p>}
+                              {(p.providerResultCode !== null && p.providerResultCode !== undefined) && (
+                                <p className={p.status === "PAID" ? "text-emerald-700" : "text-slate-500"}>
+                                  Result {p.providerResultCode}: {String(p.providerResultDesc || "").slice(0, 40)}
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
-                        {p.status === "PENDING" ? (
+                        {p.status === "PENDING" || p.status === "PAYMENT_SUBMITTED" ? (
                           <div className="flex items-center gap-1.5">
                             <Button
                               variant="outline"
@@ -902,6 +1113,33 @@ export default function Payments() {
         <WalletCreditCard />
         <PaymentConfigCard />
       </div>
+
+      {/* ------------------------- proof screenshot dialog ------------------------- */}
+      <Dialog open={proofTarget !== null} onOpenChange={(o) => !o && closeProof()}>
+        <DialogContent className="max-w-lg rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Payment proof</DialogTitle>
+            <DialogDescription>
+              {proofTarget?.paymentId} — submitted reference{" "}
+              <span className="font-mono font-semibold text-foreground">
+                {proofTarget?.submission?.reference || "—"}
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-center rounded-xl border border-border bg-surface/50 p-3">
+            {proofBusy ? (
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            ) : proofUrl ? (
+              <img src={proofUrl} alt="Payment proof" className="max-h-[420px] rounded-lg object-contain" />
+            ) : (
+              <p className="text-sm text-muted-foreground">No proof attached.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeProof}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ------------------------- verify payment dialog ------------------------- */}
       <Dialog open={verifyTarget !== null} onOpenChange={(open) => !open && setVerifyTarget(null)}>

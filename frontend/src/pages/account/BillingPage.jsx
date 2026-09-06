@@ -19,6 +19,8 @@ import {
   fetchBillingOverview, fetchMyInvoices, fetchMyPayments, fetchWallet,
   cancelInvoice, cancelPayment, payInvoiceFromWallet, topUpWallet,
   fetchReferralInfo, fetchReferralPoints, redeemReferralPoints,
+  fetchPayment, submitPaymentReference, fetchBlobUrl, fetchDialUri,
+  startMpesaPush, refreshPayment,
 } from "@/lib/portalApi";
 
 /* Status chip palettes — soft background + readable text, same family as the package pages. */
@@ -32,16 +34,30 @@ const INVOICE_TEXT = { ISSUED: "Issued", PARTIAL: "Partially paid", PAID: "Paid"
 
 const PAYMENT_STYLE = {
   PENDING: "bg-amber-100 text-amber-800",
+  PROCESSING: "bg-sky-100 text-sky-800",
+  PAYMENT_SUBMITTED: "bg-violet-100 text-violet-800",
   PAID: "bg-emerald-100 text-emerald-700",
   FAILED: "bg-rose-100 text-rose-700",
+  REJECTED: "bg-rose-100 text-rose-700",
   CANCELLED: "bg-slate-100 text-slate-600",
+  EXPIRED: "bg-orange-100 text-orange-700",
 };
-const PAYMENT_TEXT = { PENDING: "Pending", PAID: "Paid", FAILED: "Failed", CANCELLED: "Cancelled" };
+const PAYMENT_TEXT = {
+  PENDING: "Pending",
+  PROCESSING: "Waiting for confirmation",
+  PAYMENT_SUBMITTED: "Submitted",
+  PAID: "Paid",
+  FAILED: "Payment failed",
+  REJECTED: "Rejected",
+  CANCELLED: "Cancelled",
+  EXPIRED: "Expired",
+};
 
 const CHANNEL_LABEL = {
   MOBILE_MONEY: "Mobile money",
   OFFLINE: "Bank transfer / offline",
   WALLET: "Account credit",
+  MPESA: "M-Pesa (Daraja)",
 };
 
 const humanize = (s) =>
@@ -219,46 +235,6 @@ function Instructions({ value }) {
 }
 
 /* Renders a USSD top-up string as a scannable QR canvas (mirrors ParcelQR's qrcode usage). */
-function UssdQr({ value }) {
-  const canvasRef = useRef(null);
-  const [ready, setReady] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    setReady(false);
-    setFailed(false);
-    QRCode.toCanvas(canvasRef.current, value, {
-      width: 256,
-      margin: 1,
-      errorCorrectionLevel: "M",
-      color: { dark: "#0f172a", light: "#ffffff" },
-    })
-      .then(() => active && setReady(true))
-      .catch(() => active && setFailed(true));
-    return () => {
-      active = false;
-    };
-  }, [value]);
-
-  if (failed) {
-    return (
-      <p className="max-w-[220px] text-center text-[12px] text-destructive">
-        Could not generate the QR code — use the USSD string below.
-      </p>
-    );
-  }
-  return (
-    <div className="rounded-lg border border-border/70 bg-white p-2">
-      <canvas
-        ref={canvasRef}
-        style={{ width: 168, height: 168 }}
-        className={ready ? "block" : "invisible"}
-        aria-label="QR code with the mobile-money top-up code"
-      />
-    </div>
-  );
-}
 
 /* One row of the channel-state list inside the top-up dialog. WALLET/OFFLINE are informational
  * text rows; every other channel (CARD, MTN_MOMO, AIRTEL_MONEY, MPESA, …) renders disabled with
@@ -292,6 +268,392 @@ function ChannelStatusRow({ channel }) {
       </span>
       <Lock className="h-3.5 w-3.5 shrink-0 text-slate-300" aria-hidden="true" />
     </li>
+  );
+}
+
+function PaymentPayDialog({ payment, onClose, onDone }) {
+  const paymentId = payment?.paymentId || payment?._id || "";
+  const [detail, setDetail] = useState(null); // { payment, mobileMoney? }
+  const [loadError, setLoadError] = useState("");
+  const [qrUrl, setQrUrl] = useState("");
+  const [reference, setReference] = useState("");
+  const [note, setNote] = useState("");
+  const [screenshot, setScreenshot] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [subError, setSubError] = useState("");
+  const [done, setDone] = useState(null); // success message once submitted
+  const [busy, setBusy] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    let objectUrl = "";
+    setBusy(true);
+    fetchPayment(paymentId)
+      .then(async (d) => {
+        if (!alive) return;
+        setDetail(d);
+        setLoadError("");
+        if (d?.mobileMoney?.qrUrl) {
+          try {
+            objectUrl = await fetchBlobUrl(d.mobileMoney.qrUrl);
+            if (alive) setQrUrl(objectUrl);
+          } catch { /* QR optional */ }
+        }
+      })
+      .catch((err) => alive && setLoadError(err?.response?.data?.message || "Could not load this payment."))
+      .finally(() => alive && setBusy(false));
+    return () => {
+      alive = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentId]);
+
+  const mm = detail?.mobileMoney || null;
+  const prov = detail?.providerPayment || null;
+  const st = detail?.payment?.status;
+  const manualChannel = detail?.payment?.channel === "MOBILE_MONEY" || detail?.payment?.channel === "OFFLINE";
+
+  /* M-Pesa: phone + start/retry state and light polling of OUR backend only. */
+  const [phone, setPhone] = useState("");
+  const [mpesaBusy, setMpesaBusy] = useState(false);
+  const [mpesaError, setMpesaError] = useState("");
+  const isMpesaWait = prov && (st === "PENDING" || st === "PROCESSING");
+
+  useEffect(() => {
+    if (!isMpesaWait || done) return;
+    let alive = true;
+    const t = setInterval(async () => {
+      if (!alive) return;
+      try {
+        const fresh = await fetchPayment(paymentId);
+        if (alive) setDetail(fresh);
+      } catch { /* transient — keep polling */ }
+    }, 4000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentId, isMpesaWait, done]);
+
+  const sendMpesa = async () => {
+    if (!phone.trim()) {
+      setMpesaError("Enter your M-Pesa phone number.");
+      return;
+    }
+    setMpesaBusy(true);
+    setMpesaError("");
+    try {
+      const res = await startMpesaPush(paymentId, phone.trim());
+      toast.success(res.message || "Check your phone to complete the payment.");
+      const fresh = await fetchPayment(paymentId);
+      setDetail(fresh);
+      setDone(null);
+    } catch (err) {
+      setMpesaError(err?.response?.data?.message || "Unable to start the M-Pesa payment. Check your phone number and try again.");
+    } finally {
+      setMpesaBusy(false);
+    }
+  };
+
+  const checkAgain = async () => {
+    setMpesaBusy(true);
+    setMpesaError("");
+    try {
+      const res = await refreshPayment(paymentId);
+      const fresh = await fetchPayment(paymentId);
+      setDetail(fresh);
+      if (res?.message) toast.info(res.message);
+    } catch (err) {
+      setMpesaError(err?.response?.data?.message || "M-Pesa is not responding right now — still waiting for confirmation.");
+    } finally {
+      setMpesaBusy(false);
+    }
+  };
+
+  const dialNow = async () => {
+    if (!mm?.dialUrl) return;
+    try {
+      const telUri = await fetchDialUri(mm.dialUrl);
+      window.location.href = telUri; // user-initiated (button tap)
+    } catch (err) {
+      setSubError(err?.response?.data?.message || "Could not open the dialer right now.");
+    }
+  };
+
+  const submitRef = async () => {
+    if (!reference.trim()) {
+      setSubError("Enter the transaction reference from your payment.");
+      return;
+    }
+    setSubmitting(true);
+    setSubError("");
+    try {
+      const res = await submitPaymentReference(paymentId, {
+        reference: reference.trim(),
+        note: note.trim() || undefined,
+        screenshot: screenshot || undefined,
+      });
+      setDone(res.message || "Reference submitted — awaiting verification.");
+      toast.success("Reference submitted — our finance team will verify your payment.");
+      onDone();
+    } catch (err) {
+      setSubError(err?.response?.data?.message || "Could not submit the reference. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && !submitting && onClose()}>
+      <DialogContent className="max-w-md rounded-2xl">
+        {busy ? (
+          <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading payment…
+          </div>
+        ) : loadError ? (
+          <div className="space-y-3 py-4">
+            <ErrorBox message={loadError} />
+            <Button variant="outline" onClick={onClose} className="w-full">Close</Button>
+          </div>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 font-display">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <CreditCard className="h-4.5 w-4.5" style={{ width: 18, height: 18 }} />
+                </span>
+                {mm ? mm.network || "Mobile money" : channelLabel(detail?.payment?.channel)}
+              </DialogTitle>
+              <DialogDescription>
+                Payment{" "}
+                <span className="font-mono font-semibold text-foreground">
+                  {detail?.payment?.paymentId || paymentId}
+                </span>
+                {" · "}
+                <Chip status={st} style={PAYMENT_STYLE} text={PAYMENT_TEXT} />
+              </DialogDescription>
+            </DialogHeader>
+
+            {done ? (
+              <div className="flex gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3.5">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                <div className="text-[13.5px] font-semibold leading-relaxed text-emerald-800">
+                  {done}
+                  {reference.trim() && (
+                    <span className="mt-1 block font-mono text-[12.5px] text-emerald-700">Ref: {reference.trim()}</span>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {!done && mm ? (
+              <>
+                <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-4 text-center">
+                  <p className="text-[12px] font-bold uppercase tracking-wider text-slate-500">Amount to pay</p>
+                  <p className="mt-1 font-display text-[26px] font-extrabold text-foreground">
+                    {fmtAmount(mm.amount, mm.currency) || "—"}
+                  </p>
+                  {qrUrl ? (
+                    <img
+                      src={qrUrl}
+                      alt="Scan to pay with mobile money"
+                      className="mx-auto mt-3 h-44 w-44 rounded-lg border border-[#e5eaf2] bg-white p-1"
+                    />
+                  ) : null}
+                  <p className="mt-2 text-[12px] font-semibold text-slate-500">Scan with your phone to continue</p>
+                  {mm.ussd ? (
+                    <div className="mx-auto mt-2 flex max-w-[260px] items-center gap-2 rounded-lg bg-white px-3 py-2">
+                      <span className="min-w-0 flex-1 truncate font-mono text-[14px] font-bold text-foreground">{mm.ussd}</span>
+                      <CopyButton value={mm.ussd} label="Copy" />
+                    </div>
+                  ) : null}
+                  {mm.dialUrl ? (
+                    <button
+                      type="button"
+                      onClick={dialNow}
+                      className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-accent text-[15px] font-bold text-accent-foreground shadow-sm transition hover:bg-accent/90"
+                    >
+                      <Smartphone className="h-4.5 w-4.5" style={{ width: 18, height: 18 }} /> Pay on phone
+                    </button>
+                  ) : null}
+                </div>
+
+                <div className="space-y-2 rounded-xl border border-[#e5eaf2] bg-surface/40 px-4 py-3.5">
+                  <p className="flex items-center gap-1.5 text-[13px] font-bold text-foreground">
+                    <Info className="h-4 w-4 text-primary" /> Completed the payment?
+                  </p>
+                  <p className="text-[12.5px] leading-relaxed text-slate-500">
+                    Enter the transaction reference from your mobile money message{mm.invoiceReference ? ` (invoice ${mm.invoiceReference})` : ""}. Submitting it sends your payment for verification — it is credited only after finance confirms it.
+                  </p>
+                </div>
+              </>
+            ) : null}
+
+            {!done && prov ? (
+              prov.status === "PAID" ? (
+                <div className="flex gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3.5">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                  <div className="text-[13.5px] font-semibold leading-relaxed text-emerald-800">
+                    {prov.message}
+                    {prov.receipt && <span className="mt-1 block font-mono text-[12.5px] text-emerald-700">Receipt: {prov.receipt}</span>}
+                  </div>
+                </div>
+              ) : prov.status === "PROCESSING" ? (
+                <div className="space-y-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3.5">
+                  <div className="flex items-start gap-3">
+                    <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-sky-600" />
+                    <div>
+                      <p className="text-[14px] font-bold text-sky-900">Waiting for confirmation</p>
+                      <p className="mt-0.5 text-[13px] leading-relaxed text-sky-800">{prov.message}</p>
+                      {prov.phoneMasked && (
+                        <p className="mt-1 text-[12px] text-sky-700">Request sent to {prov.phoneMasked}</p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={checkAgain}
+                        disabled={mpesaBusy}
+                        className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-bold text-sky-800 underline-offset-2 hover:underline"
+                      >
+                        {mpesaBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                        Check again
+                      </button>
+                    </div>
+                  </div>
+                  {mpesaError && <ErrorBox message={mpesaError} />}
+                </div>
+              ) : prov.status === "CANCELLED" ? (
+                <div className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+                  <p className="text-[13.5px] font-semibold leading-relaxed text-slate-700">
+                    {prov.message || "Payment was cancelled."}
+                  </p>
+                </div>
+              ) : (
+                /* PENDING / FAILED / EXPIRED — start or retry an M-Pesa request */
+                <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-4">
+                  <p className="text-sm font-bold text-foreground">
+                    {prov.status === "PENDING" ? "Pay with M-Pesa" : prov.status === "EXPIRED" ? "M-Pesa request expired" : "M-Pesa payment failed"}
+                  </p>
+                  <p className="text-[13px] text-slate-600">
+                    Amount due:{" "}
+                    <span className="font-bold text-foreground">
+                      {fmtAmount(prov.settlementAmount, prov.settlementCurrency) || fmtAmount(detail?.payment?.amount, detail?.payment?.currency)}
+                    </span>
+                    {prov.settlementCurrency && detail?.payment?.currency && prov.settlementCurrency !== detail?.payment?.currency && (
+                      <span className="text-slate-400"> (charged in {prov.settlementCurrency})</span>
+                    )}
+                  </p>
+                  {prov.providerResultDesc && prov.status !== "PENDING" && (
+                    <p className="rounded-md bg-surface px-3 py-2 text-[12px] text-slate-500">{prov.providerResultDesc}</p>
+                  )}
+                  <div>
+                    <Label htmlFor="mpesa-phone" className="text-[13px] font-semibold">M-Pesa phone number</Label>
+                    <Input
+                      id="mpesa-phone"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="e.g. 0712XXXXXX or +2547XXXXXXXX"
+                      className="mt-1.5"
+                      maxLength={20}
+                      inputMode="tel"
+                    />
+                    <p className="mt-1 text-[11.5px] text-slate-400">
+                      We send a payment request to this phone — you confirm with your M-Pesa PIN in the M-Pesa prompt.
+                      SwiftKifisha never asks for your PIN.
+                    </p>
+                  </div>
+                  {mpesaError && <ErrorBox message={mpesaError} />}
+                  <Button
+                    type="button"
+                    onClick={sendMpesa}
+                    disabled={mpesaBusy || !phone.trim()}
+                    className="h-11 w-full gap-2 bg-accent font-bold text-accent-foreground hover:bg-accent/90"
+                  >
+                    {mpesaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    {mpesaBusy ? "Sending request…" : "Send payment request"}
+                  </Button>
+                </div>
+              )
+            ) : null}
+
+            {!done && manualChannel && st !== "PAYMENT_SUBMITTED" ? (
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="pay-ref" className="text-[13px] font-semibold">Transaction reference</Label>
+                  <Input
+                    id="pay-ref"
+                    value={reference}
+                    onChange={(e) => setReference(e.target.value)}
+                    placeholder="e.g. MM-77881245-UGX"
+                    className="mt-1.5"
+                    maxLength={80}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="pay-note" className="text-[13px] font-semibold">Note (optional)</Label>
+                  <Textarea
+                    id="pay-note"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Anything finance should know?"
+                    className="mt-1.5 min-h-[64px] resize-none text-sm"
+                    maxLength={500}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="pay-shot" className="text-[13px] font-semibold">Payment screenshot (optional)</Label>
+                  <input
+                    id="pay-shot"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={(e) => setScreenshot(e.target.files?.[0] || null)}
+                    className="mt-1.5 block w-full text-[13px] text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-[13px] file:font-bold file:text-primary"
+                  />
+                </div>
+                {subError && <ErrorBox message={subError} />}
+                <Button
+                  type="button"
+                  onClick={submitRef}
+                  disabled={submitting || !reference.trim()}
+                  className="h-11 w-full gap-2 bg-accent font-bold text-accent-foreground hover:bg-accent/90"
+                >
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {submitting ? "Submitting…" : "I've completed payment — send for verification"}
+                </Button>
+              </div>
+            ) : null}
+
+            {!done && st === "PAYMENT_SUBMITTED" && (
+              <div className="flex gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3.5">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-violet-600" />
+                <p className="text-[13px] font-semibold leading-relaxed text-violet-800">
+                  Submitted with reference{" "}
+                  <span className="font-mono">{detail?.payment?.submission?.reference}</span> — finance is verifying
+                  your payment.
+                </p>
+              </div>
+            )}
+
+            {!done && st === "REJECTED" && detail?.payment?.rejectReason && (
+              <div className="flex gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3.5">
+                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
+                <p className="text-[13px] font-semibold leading-relaxed text-rose-700">
+                  This submission was rejected: {detail.payment.rejectReason}
+                </p>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={onClose} disabled={submitting} className="w-full sm:w-auto">
+                {done ? "Done" : "Close"}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -405,6 +767,15 @@ export default function BillingPage() {
     if (paymentCancelling) return;
     setPaymentCancelTarget(null);
     setPaymentCancelError("");
+  };
+
+  /* Pay & submit dialog (manual mobile-money / bank transfer payments). */
+  const [manualPayTarget, setManualPayTarget] = useState(null);
+  const openManualPay = (pay) => {
+    setManualPayTarget(pay);
+  };
+  const closeManualPay = () => {
+    setManualPayTarget(null);
   };
   const confirmPaymentCancel = async () => {
     if (!paymentCancelTarget) return;
@@ -572,20 +943,12 @@ export default function BillingPage() {
   const topupChannelRows = Array.isArray(topupWallet?.channels) ? topupWallet.channels : [];
   const mmChannel = topupChannelRows.find((c) => c.code === "MOBILE_MONEY") || null;
   const offlineChannel = topupChannelRows.find((c) => c.code === "OFFLINE") || null;
-  const momoConfig =
-    mmChannel && mmChannel.ussdTemplate && mmChannel.number ? mmChannel : topupWallet?.momo || null;
+  const momoConfig = topupWallet?.momo || null; // public summary {method, network, enabled} only
   const topupWalletCur = topupWallet ? topupWallet.walletCurrency || topupWallet.currency || "USD" : "USD";
   const showTopupChooser = Boolean(mmChannel || offlineChannel);
-  const ussdCode =
-    topupChannel === "MOBILE_MONEY" &&
-    topupWalletCur === "UGX" &&
-    topupAmountValid &&
-    momoConfig &&
-    momoConfig.enabled !== false &&
-    momoConfig.number &&
-    momoConfig.ussdTemplate
-      ? momoConfig.ussdTemplate.replace("{amount}", String(topupAmountNum)).replace("{number}", momoConfig.number)
-      : null;
+  // The public code/QR for an exact amount is delivered per payment (see the
+  // payment card after a top-up) — never built from private config here.
+  const ussdCode = null;
 
   /* Derived numbers — tiles lean on the live lists when the overview is unavailable. */
   const ov = overview.data;
@@ -863,6 +1226,33 @@ export default function BillingPage() {
                   <span className="font-mono text-[15px] font-bold text-foreground">
                     {fmtAmount(pay.amount, pay.currency) || "—"}
                   </span>
+                  {pay.status === "PENDING" && pay.channel === "MPESA" && (
+                    <button
+                      type="button"
+                      onClick={() => openManualPay(pay)}
+                      className="inline-flex h-9 items-center rounded-lg bg-accent px-3 text-[13px] font-bold text-white shadow-sm transition-colors hover:bg-accent/90"
+                    >
+                      Pay with M-Pesa
+                    </button>
+                  )}
+                  {(pay.status === "PROCESSING" || pay.status === "EXPIRED" || pay.status === "FAILED") && pay.channel === "MPESA" && (
+                    <button
+                      type="button"
+                      onClick={() => openManualPay(pay)}
+                      className="inline-flex h-9 items-center rounded-lg bg-sky-50 px-3 text-[13px] font-bold text-sky-700 transition-colors hover:bg-sky-100"
+                    >
+                      {pay.status === "PROCESSING" ? "View status" : "Try M-Pesa again"}
+                    </button>
+                  )}
+                  {pay.status === "PENDING" && (pay.channel === "MOBILE_MONEY" || pay.channel === "OFFLINE") && (
+                    <button
+                      type="button"
+                      onClick={() => openManualPay(pay)}
+                      className="inline-flex h-9 items-center rounded-lg bg-accent px-3 text-[13px] font-bold text-white shadow-sm transition-colors hover:bg-accent/90"
+                    >
+                      Pay & submit
+                    </button>
+                  )}
                   {pay.status === "PENDING" && (
                     <button
                       type="button"
@@ -870,6 +1260,15 @@ export default function BillingPage() {
                       className="inline-flex h-9 items-center rounded-lg px-3 text-[13px] font-bold text-destructive transition-colors hover:bg-destructive/5"
                     >
                       Cancel
+                    </button>
+                  )}
+                  {pay.status === "PAYMENT_SUBMITTED" && (
+                    <button
+                      type="button"
+                      onClick={() => openManualPay(pay)}
+                      className="inline-flex h-9 items-center rounded-lg border border-violet-200 bg-violet-50 px-3 text-[13px] font-bold text-violet-700 transition-colors hover:bg-violet-100"
+                    >
+                      View submission
                     </button>
                   )}
                 </div>
@@ -1287,6 +1686,10 @@ export default function BillingPage() {
         </DialogContent>
       </Dialog>
 
+      {manualPayTarget && (
+        <PaymentPayDialog payment={manualPayTarget} onClose={closeManualPay} onDone={refreshAll} />
+      )}
+
       {/* --------------------------- top up wallet dialog --------------------------- */}
       <Dialog open={topupOpen} onOpenChange={(o) => !o && closeTopup()}>
         <DialogContent className="max-w-md rounded-2xl">
@@ -1358,7 +1761,24 @@ export default function BillingPage() {
                 .
               </p>
 
-              <DialogFooter>
+              <DialogFooter className="sm:justify-between">
+                {(topupResult.payment?.channel === "MOBILE_MONEY" || topupResult.payment?.channel === "OFFLINE") &&
+                topupResult.payment?.status === "PENDING" ? (
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      const p = topupResult.payment;
+                      setTopupResult(null);
+                      setTopupOpen(false);
+                      setManualPayTarget(p);
+                    }}
+                    className="gap-2 bg-accent font-bold text-accent-foreground hover:bg-accent/90"
+                  >
+                    <Smartphone className="h-4 w-4" /> Scan & pay now
+                  </Button>
+                ) : (
+                  <span />
+                )}
                 <Button type="button" onClick={closeTopup} className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
                   Done
                 </Button>
@@ -1498,10 +1918,9 @@ export default function BillingPage() {
                             <span className="block text-[13.5px] font-bold text-foreground">
                               Mobile money (MTN / Airtel)
                             </span>
-                            {(momoConfig?.networkLabel || momoConfig?.number) && (
+                            {momoConfig?.networkLabel && (
                               <span className="mt-0.5 block truncate text-[12px] text-slate-500">
-                                {momoConfig.networkLabel ? momoConfig.networkLabel + " · " : ""}
-                                Pay to {momoConfig.number}
+                                {momoConfig.networkLabel ? momoConfig.networkLabel : "Mobile money"}
                               </span>
                             )}
                           </span>
@@ -1570,52 +1989,6 @@ export default function BillingPage() {
                     )}
                     <p className="text-[12px] leading-relaxed text-slate-400">
                       Send the amount and keep the payment reference — your wallet is credited after finance
-                      confirms the transfer.
-                    </p>
-                  </div>
-                )}
-
-                {topupChannel === "MOBILE_MONEY" && topupWalletCur === "UGX" && ussdCode && momoConfig && (
-                  <div className="rounded-xl border border-emerald-200/80 bg-white p-4">
-                    <p className="flex items-center gap-2 text-sm font-bold text-foreground">
-                      <Smartphone className="h-4 w-4 text-primary" /> Mobile money top-up
-                    </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-x-8 gap-y-3 rounded-lg bg-surface/50 px-3.5 py-2.5 text-[13px]">
-                      <p>
-                        <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                          Pay to
-                        </span>
-                        <span className="mt-0.5 block font-mono text-[15px] font-bold text-foreground">
-                          {momoConfig.number}
-                        </span>
-                      </p>
-                      <p>
-                        <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                          Network
-                        </span>
-                        <span className="mt-0.5 block font-semibold text-slate-700">
-                          {momoConfig.networkLabel || "Mobile money"}
-                        </span>
-                      </p>
-                    </div>
-
-                    <div className="mt-4 flex flex-col items-center gap-2 text-center">
-                      <UssdQr value={ussdCode} />
-                      <p className="max-w-xs text-[12.5px] leading-relaxed text-slate-500">
-                        Scan with your phone to open the top-up code
-                      </p>
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-[#e5eaf2] bg-surface/40 px-3.5 py-2.5">
-                      <code className="min-w-0 flex-1 break-all font-mono text-[12px] font-semibold text-slate-700">
-                        {ussdCode}
-                      </code>
-                      <CopyButton value={ussdCode} label="Copy" />
-                    </div>
-
-                    <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-[12.5px] leading-relaxed text-emerald-800">
-                      This opens the send-money code on your phone — confirm with your MoMo PIN to send{" "}
-                      {fmtAmount(topupAmountNum, "UGX")} to SwiftKifisha. Your wallet is credited after finance
                       confirms the transfer.
                     </p>
                   </div>

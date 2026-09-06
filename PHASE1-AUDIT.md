@@ -249,3 +249,53 @@ Final status (this session):
   payments/shipments/config), comms (notifications/announcements/messages),
   file authz (401/403/404) — all green; added missing member `GET /api/ledger`.
 - **Builds**: member frontend exit 0, dashboard exit 0; i18n parity intact.
+
+
+---
+
+# M-Pesa (Daraja) — real provider implementation
+
+- **Crash fix**: `ReferenceError: fetchPayment is not defined` (BillingPage) was
+  a missing import — the import statement for the payment API helpers was never
+  persisted (a failed batch edit). Fixed by importing
+  `fetchPayment, submitPaymentReference, fetchBlobUrl, fetchDialUri,
+  startMpesaPush, refreshPayment` from `frontend/src/lib/portalApi.js`, plus an
+  `apiPath()` normalizer preventing double `/api/api/` URLs for the QR/dial
+  fetches. Regression-verified: identifier scan + parse + production build.
+- **Service** (`backend/src/lib/mpesa.js`): env-only credentials; OAuth token
+  with 50-min cache & 401/403/429/5xx/timeout handling; MSISDN normalization
+  (07…, 2547…, +2547…); STK push (server amount, shortcode+passkey timestamp
+  credential); status query; callback parser with Daraja result-code mapping
+  (0→PAID, 1032→CANCELLED, 1037/1036→EXPIRED, others→FAILED with raw code kept).
+- **Routes** (`backend/src/routes/money.routes.js`): member
+  `POST /api/payments/mpesa/stk-push` (ownership, 5/min per-user rate limit,
+  amount strictly from the stored payment, explicit settlement-currency
+  conversion via pricing rules `mpesa.rateUgx`/`mpesa.rateUsd` — never silent
+  conversion); public `POST /api/payments/mpesa/callback` (parses, finds by
+  CheckoutRequestID, amount + receipt checks, idempotent, ACKs fast);
+  member `POST /api/payments/:id/refresh` (Daraja query, throttled 20 s);
+  `GET /api/payments/:id` now includes a `providerPayment` block with masked
+  phone, checkout/merchant ids, receipt, result code/description and friendly
+  member-facing messages.
+- **Reconciliation**: verified success only → payment PAID via
+  `applyProviderPaid` with duplicate-receipt + already-PAID guards; invoice
+  settled through `applyPaymentToInvoice` (shipment release only when fully
+  paid); wallet top-ups credited through the immutable ledger in the payment
+  currency; audit rows for every step (STK accepted, callback received,
+  confirmed/failed/cancelled, wallet credited, invoice paid).
+- **Statuses**: added EXPIRED; PROCESSING supported; UI labels updated in
+  member BillingPage and dashboard moneyOps (incl. “M-Pesa (Daraja)” channel
+  labels). Member Billing: “Pay with M-Pesa” (amount + phone) →
+  “Waiting for confirmation” → polling every 4 s against OUR backend →
+  PAID/FAILED/CANCELLED/EXPIRED states; never asks for the PIN; retry for
+  EXPIRED/FAILED; “Check again” hits the throttled refresh route.
+- **Dashboard**: moneyOps + Payments rows label M-Pesa; provider config card
+  shows “M-Pesa — Connected. Environment: Sandbox/Production” only when the
+  backend has key+secret+passkey+shortcode (presence check at startup) — the
+  label never comes from frontend env.
+- **Status**: sandbox transaction NOT yet executed — initiation is gated off
+  because `MPESA_SHORTCODE` is not set and a live OAuth probe with the
+  provided key/secret returned HTTP 400 in both environments (secret looks
+  like an RSA blob; Daraja OAuth normally expects the plain portal secret).
+  Everything downstream is implemented and will activate without code changes
+  once the correct secret/environment/shortcode/callback URL are configured.

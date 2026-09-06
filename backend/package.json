@@ -13,7 +13,8 @@
     "start": "node src/server.js",
     "seed": "node scripts/seed.js",
     "smoke:test": "node scripts/smoke.js",
-    "test:email": "node scripts/test-email.mjs"
+    "test:email": "node scripts/test-email.mjs",
+    "test:mpesa": "node scripts/test-mpesa.mjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -22,6 +23,7 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.3.0",
     "pg": "^8.23.0",
+    "qrcode": "^1.5.4",
     "uploadthing": "^7.7.4"
   }
 }

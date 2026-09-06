@@ -167,3 +167,60 @@ export const redeemReferralPoints = async (points) => {
   const { data } = await axiosInstance.post("/referrals/redeem", { points }, { headers: auth() });
   return data; // { message, pointsDebited, usdCredited, balance, walletBalance }
 };
+
+/* ------------------------- payment lifecycle (manual money) ------------------------- */
+
+/** GET /payments/:id — own payment + mobileMoney block (public only). */
+export const fetchPayment = async (idOrPaymentId) => {
+  const { data } = await axiosInstance.get(`/payments/${idOrPaymentId}`, { headers: auth() });
+  return data; // { payment, mobileMoney?: { method, network, amount, currency, ussd, qrUrl, dialUrl, invoiceReference } }
+};
+
+/**
+ * POST /payments/:id/submit — multipart (reference required; note?;
+ * screenshot? optional image ≤ 5 MB). Moves PENDING → PAYMENT_SUBMITTED;
+ * NEVER marks paid.
+ */
+export const submitPaymentReference = async (idOrPaymentId, { reference, note, screenshot }) => {
+  const fd = new FormData();
+  fd.append("reference", reference);
+  if (note) fd.append("note", note);
+  if (screenshot) fd.append("screenshot", screenshot);
+  const { data } = await axiosInstance.post(`/payments/${idOrPaymentId}/submit`, fd, {
+    headers: { ...auth(), "Content-Type": "multipart/form-data" },
+  });
+  return data; // { message, payment }
+};
+
+/** Strip a leading /api when the axios base URL already ends with /api. */
+const apiPath = (url) => {
+  const u = String(url || "");
+  const base = axiosInstance.defaults.baseURL || "";
+  return u.startsWith("/api") && base.endsWith("/api") ? u.slice(4) || "/" : u;
+};
+
+/** Authenticated fetch of a protected URL (QR image) → object URL (revoke after use). */
+export const fetchBlobUrl = async (url, mime = "image/png") => {
+  const res = await axiosInstance.get(apiPath(url), { headers: auth(), responseType: "blob" });
+  return URL.createObjectURL(new Blob([res.data], { type: mime }));
+};
+
+/** GET payment dial tel: URI (owner only; call on explicit "Pay on phone" tap). */
+export const fetchDialUri = async (dialUrl) => {
+  const { data } = await axiosInstance.get(apiPath(dialUrl), { headers: auth() });
+  return data.telUri; // tel:*165*…%23
+};
+
+/* ------------------------- M-Pesa (Daraja) ------------------------- */
+
+/** POST /payments/mpesa/stk-push { paymentId, phoneNumber } → STK push (server amount). */
+export const startMpesaPush = async (paymentId, phoneNumber) => {
+  const { data } = await axiosInstance.post("/payments/mpesa/stk-push", { paymentId, phoneNumber }, { headers: auth() });
+  return data; // { paymentId, status, message, checkoutRequestId }
+};
+
+/** POST /payments/:id/refresh — Daraja status query (throttled server-side). */
+export const refreshPayment = async (idOrPaymentId) => {
+  const { data } = await axiosInstance.post(`/payments/${idOrPaymentId}/refresh`, {}, { headers: auth() });
+  return data; // { paymentId, status, message }
+};

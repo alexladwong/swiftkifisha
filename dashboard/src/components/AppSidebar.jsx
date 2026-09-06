@@ -95,14 +95,17 @@ export function AppSidebar() {
         <div
           className={`flex items-center gap-2 px-4 py-5 ${collapsed ? "justify-center" : ""}`}
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-ring text-sidebar-primary font-bold text-sm">
-            SU
+          <a className="flex items-center gap-2 bg-transparent" href="/">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-sidebar-primary font-bold text-sm">
+            <img src="logo.png" alt="logo" className="h-12 w-12" />
           </div>
+
           {!collapsed && (
-            <span className="text-lg font-bold text-sidebar-foreground tracking-tight">
-             SwiftKifisha Global
-            </span>
-          )}
+              <span className="text-lg font-bold text-sidebar-foreground tracking-tight">
+                SwiftKifisha Global
+              </span>
+            )}
+          </a>
         </div>
 
         <SidebarGroup>

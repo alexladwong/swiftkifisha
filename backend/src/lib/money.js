@@ -27,6 +27,7 @@ export const PAYMENT_STATUS = {
   FAILED: "FAILED",
   REJECTED: "REJECTED",
   CANCELLED: "CANCELLED",
+  EXPIRED: "EXPIRED",
   REFUNDED: "REFUNDED",
   PARTIALLY_REFUNDED: "PARTIALLY_REFUNDED",
 };
@@ -35,13 +36,14 @@ export const PAYMENT_STATUS = {
 // Manual mobile-money lifecycle: PENDING → (member submits transaction
 // reference) → PAYMENT_SUBMITTED → (finance verify) → PAID | (reject) → REJECTED.
 export const PAYMENT_TRANSITIONS = {
-  PENDING: ["PAID", "FAILED", "CANCELLED", "PROCESSING", "PAYMENT_SUBMITTED"],
-  PROCESSING: ["PAID", "FAILED", "CANCELLED", "PAYMENT_SUBMITTED"],
+  PENDING: ["PAID", "FAILED", "CANCELLED", "PROCESSING", "PAYMENT_SUBMITTED", "EXPIRED"],
+  PROCESSING: ["PAID", "FAILED", "CANCELLED", "PAYMENT_SUBMITTED", "EXPIRED"],
   PAYMENT_SUBMITTED: ["PAID", "REJECTED", "FAILED"],
   PAID: ["REFUNDED", "PARTIALLY_REFUNDED"],
   FAILED: ["PENDING"],
   REJECTED: ["PAYMENT_SUBMITTED"],
   CANCELLED: [],
+  EXPIRED: ["PENDING"],
   REFUNDED: [],
   PARTIALLY_REFUNDED: [],
 };
@@ -119,6 +121,13 @@ export const MOMO_DEFAULT = {
   ussdTemplate: "*165*1*{amount}#",
 };
 
+/**
+ * PRIVATE dial template — may include {number} (settlement number). It is
+ * only ever used server-side to build the QR image and the on-tap dial URI;
+ * it is never returned to member payloads and never rendered by the frontend.
+ */
+export const MOMO_DIAL_DEFAULT = "*165*1*{amount}*{number}#";
+
 /** Per-network public templates (Airtel dials *185*1*1*<amount>#). */
 export const MOMO_NETWORK_PRESETS = {
   MTN: { label: "MTN Mobile Money (Uganda)", template: "*165*1*{amount}#" },
@@ -145,6 +154,18 @@ export function momoTopupConfig() {
     } catch { /* best effort */ }
   }
   return merged;
+}
+
+/**
+ * Full dial string for one payment (private): replaces BOTH {amount} and
+ * {number} using the settlement number from config. Server-side only.
+ */
+export function privateUssd(amount, dialTemplate, number) {
+  const tpl = String(dialTemplate || MOMO_DIAL_DEFAULT);
+  const whole = String(Math.round(Number(amount) || 0));
+  const num = String(number || "");
+  if (!num) return publicUssd(amount, tpl);
+  return tpl.split("{amount}").join(whole).split("{number}").join(num).replace(/\s+/g, "");
 }
 
 /** Public USSD for one payment amount — server-authoritative amount only. */
@@ -200,16 +221,18 @@ export function manualTopupChannels() {
     code: "MOBILE_MONEY", label: "Mobile money (MTN / Airtel)", integration: "manual",
     method: "MOBILE_MONEY_MANUAL",
     enabled: momo.enabled !== false, configured: momo.enabled !== false,
-    // Public copy only — settlement number stays private; the per-payment
-    // QR/USSD is generated server-side from the authorized amount.
+    // Public copy only — no settlement number, no private details. The
+    // per-payment QR/dial data is generated server-side from the authorized
+    // amount and delivered as an image (or on explicit tap) to the payer.
     network: momo.networkLabel,
-    instructions: "Scan or dial the code shown for your amount, pay from your phone, then submit the transaction reference.",
+    instructions: "Pay from your phone with the QR or code shown for your exact amount, then submit the transaction reference below.",
     topup: true, invoice: true,
   });
   out.push({
     code: "OFFLINE", label: "Bank transfer / offline", integration: "manual",
     enabled: offlineEnabled, configured: true,
-    instructions: cfg?.offline?.instructions || "", topup: true, invoice: true,
+    instructions: "Pay by bank transfer, then submit the transaction reference below — our finance team confirms the payment before credit is added.",
+    topup: true, invoice: true,
   });
   return out;
 }
@@ -267,7 +290,15 @@ export function configuredChannels() {
     if (ch.integration !== "api") continue;
     const adminEnabled = cfg?.channels?.[ch.code]?.enabled === true;
     const status = describeProvider(ch.code) || { configured: false, message: "Integration prepared — provider credentials required." };
-    out.push({ ...ch, configured: adminEnabled && status.configured, enabled: adminEnabled, providerStatus: status });
+    // Member copy stays generic; detailed credential status is admin-only.
+    const memberMessage = ch.code === "CARD"
+      ? "Visa/Mastercard payments — coming soon (provided by the bank)."
+      : status.configured && status.initiable
+        ? "Available — live provider."
+        : status.configured
+          ? "Integration prepared — activation pending (finance)."
+          : "Integration prepared — provider credentials required.";
+    out.push({ ...ch, configured: adminEnabled && status.configured && status.initiable !== false, enabled: adminEnabled, providerStatus: { ...status, message: memberMessage } });
   }
   return out;
 }
@@ -290,8 +321,13 @@ export function channelReady(code, purpose = "topup") {
     }
     return { ok: false, message: "That payment channel is not available for this payment." };
   }
-  if (found.integration === "api" && !found.configured) {
-    return { ok: false, message: found.providerStatus?.message || "Integration prepared — provider credentials required." };
+  if (found.integration === "api") {
+    if (!found.configured || found.providerStatus?.initiable === false) {
+      const msg = found.code === "MPESA" && found.providerStatus?.configured
+        ? "M-Pesa is activated once the paybill number is configured (finance)."
+        : (found.providerStatus?.message || "Integration prepared — provider credentials required.");
+      return { ok: false, message: msg };
+    }
   }
   return { ok: true, channel: found };
 }

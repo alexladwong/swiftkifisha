@@ -7,23 +7,29 @@
  */
 
 /** Payment lifecycle statuses shown in the finance queue. */
-export const PAYMENT_STATUSES = ["PENDING", "PROCESSING", "PAID", "FAILED", "CANCELLED"];
+export const PAYMENT_STATUSES = ["PENDING", "PROCESSING", "PAYMENT_SUBMITTED", "PAID", "FAILED", "REJECTED", "CANCELLED", "EXPIRED"];
 
 export const PAYMENT_STATUS_LABEL = {
   PENDING: "Pending",
   PROCESSING: "Processing",
+  PAYMENT_SUBMITTED: "Submitted",
   PAID: "Paid",
   FAILED: "Failed",
+  REJECTED: "Rejected",
   CANCELLED: "Cancelled",
+  EXPIRED: "Expired",
 };
 
 /** Soft chip colors, in the same palette the dashboard uses. */
 export const PAYMENT_STATUS_STYLE = {
   PENDING: "bg-amber-100 text-amber-800",
   PROCESSING: "bg-blue-100 text-blue-800",
+  PAYMENT_SUBMITTED: "bg-violet-100 text-violet-800",
   PAID: "bg-green-100 text-green-800",
   FAILED: "bg-red-100 text-red-700",
+  REJECTED: "bg-red-100 text-red-700",
   CANCELLED: "bg-slate-200 text-slate-700",
+  EXPIRED: "bg-orange-100 text-orange-800",
 };
 
 /** Invoice lifecycle statuses. */
@@ -88,6 +94,7 @@ export const CHANNEL_LABEL = {
   MTN_MOMO: "MTN Mobile Money (not configured)",
   AIRTEL_MONEY: "Airtel Money (not configured)",
   CARD: "Card (not configured)",
+  MPESA: "M-Pesa (Daraja)",
 };
 
 /** Channel codes whose rows show a configure/unconfigured state in the UI. */

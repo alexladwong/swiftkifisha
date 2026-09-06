@@ -6,9 +6,10 @@
  */
 import { Router } from "express";
 import crypto from "node:crypto";
+import { config } from "../config.js";
 import { db } from "../lib/db.js";
 import { ah, requireAuth } from "../middleware/auth.js";
-import { addAudit, withIdempotency } from "../lib/commerce.js";
+import { addAudit, withIdempotency, ruleValue } from "../lib/commerce.js";
 import { sendGenericEmail } from "../lib/mailer.js";
 import {
   PAYMENT_STATUS, INVOICE_STATUS, SHIPMENT_STATUS, SHIPMENT_TRANSITIONS,
@@ -17,10 +18,33 @@ import {
   shipmentId, invoiceId, paymentId,
   ledgerBalance, ledgerBalances, addLedger, buildInvoiceLines, money,
   memberWalletCurrency, walletMinTopup, RATE_USD_UGX, momoTopupConfig,
+  publicUssd, privateUssd, ussdTelUri, maskedNumber, validPublicUssdTemplate, MOMO_DIAL_DEFAULT,
 } from "../lib/money.js";
-import { describeProvider, describeAllProviders, verifyProviderWebhook, hashEvent, PROVIDER_BY_CODE } from "../lib/paymentProviders.js";
+import multer from "multer";
+import path from "node:path";
+import fs from "node:fs";
+import QRCode from "qrcode";
+import { describeProvider, describeAllProviders, verifyProviderWebhook, hashEvent, PROVIDER_BY_CODE, testDarajaConnection, providerCanInitiate } from "../lib/paymentProviders.js";
+import { initiateStkPush, queryStkStatus, parseStkCallback, normalizeMsisdn, mpesaConfigured, MPESA_RESULT_MAP, mpesaShortcodeSet } from "../lib/mpesa.js";
 
 const router = Router();
+const PROOF_DIR = path.join(config.root, "data", "uploads", "proofs");
+fs.mkdirSync(PROOF_DIR, { recursive: true });
+const proofStorage = multer.diskStorage({
+  destination: (_r, _f, cb) => cb(null, PROOF_DIR),
+  filename: (_r, f, cb) => cb(null, crypto.randomUUID() + path.extname(f.originalname || ".jpg").toLowerCase()),
+});
+const proofUpload = multer({
+  storage: proofStorage,
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_r, f, cb) => {
+    const ok = /^image\/(jpeg|png|webp|gif)$/.test(f.mimetype);
+    if (ok) return cb(null, true);
+    const e = new Error("Proof must be a JPEG, PNG, WEBP or GIF image (max 5 MB).");
+    e.statusCode = 400;
+    cb(e, false);
+  },
+});
 
 /* --------------------------------- helpers --------------------------------- */
 
@@ -43,6 +67,12 @@ const validDestination = (d) => {
   const r = (s) => String(s || "").trim();
   return r(d.recipientName) && r(d.line1) && r(d.city) && r(d.country);
 };
+
+/** Public-only mobile-money summary — never the settlement number. */
+function publicMomoSummary() {
+  const momo = momoTopupConfig();
+  return { method: "MOBILE_MONEY_MANUAL", network: momo.networkLabel, enabled: momo.enabled !== false };
+}
 
 function emailMember(to, subject, html) {
   sendGenericEmail({ to, subject, html }).catch((e) => console.error(`[mail] ${subject} -> ${to} failed:`, e?.message ?? e));
@@ -146,7 +176,7 @@ router.get("/billing/overview", requireAuth, ah(async (req, res) => {
     unpaidPayments: payments.filter((p) => p.status === "PENDING").length,
     recentInvoices: [...inv].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5),
     recentPayments: [...payments].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5),
-    paymentInstructions: cfg?.offline?.instructions || "",
+    paymentInstructions: "",
     channels: configuredChannels(),
   });
 }));
@@ -252,7 +282,7 @@ router.post("/checkout", requireAuth, ah(async (req, res) => {
   return res.status(201).json({
     message: "Invoice created — payment is pending confirmation.",
     invoice, payment,
-    paymentInstructions: cfg?.offline?.instructions || "",
+    paymentInstructions: "",
     channels: configuredChannels(),
   });
 }));
@@ -334,7 +364,7 @@ router.get("/wallet", requireAuth, ah(async (req, res) => {
     minTopup: { amount: walletMinTopup(walletCurrency), currency: walletCurrency },
     rateUsdUgx: RATE_USD_UGX,
     channels: configuredChannels(),
-    momo: momoTopupConfig(),
+    momo: publicMomoSummary(),
     entries: rows,
   });
 }));
@@ -349,23 +379,24 @@ router.post("/wallet/topup", requireAuth, ah(async (req, res) => {
   const user = memberByToken(req);
   const member = memberRow(user);
   if (!member) return res.status(403).json({ message: "Member profile required." });
-  const currency = memberWalletCurrency(member);
-  const min = walletMinTopup(currency);
+  let currency = memberWalletCurrency(member);
+  const wantCur = String((req.body || {}).currency || "").toUpperCase();
+  if (wantCur === "KES") currency = "KES"; // M-Pesa (Daraja) settlement currency
+  const min = currency === "KES" ? Math.max(1, Math.round(Number(ruleValue("topup.minKes", 100)) || 100)) : walletMinTopup(currency);
   const amount = Math.round((Number((req.body || {}).amount) || 0) * 100) / 100;
   if (!Number.isFinite(amount) || amount <= 0) {
     return res.status(400).json({ message: `Enter an amount to top up (minimum ${min} ${currency}).` });
   }
   if (amount < min) {
-    return res.status(400).json({ message: `Minimum top-up is ${min} ${currency} (≈ USD ${currency === "UGX" ? (min / RATE_USD_UGX).toFixed(2) : min}).` });
+    return res.status(400).json({ message: `Minimum top-up is ${min} ${currency}${currency === "UGX" ? ` (≈ USD ${(min / RATE_USD_UGX).toFixed(2)})` : ""}.` });
   }
   const wantChannel = String((req.body || {}).channel || (momoTopupConfig().enabled !== false ? "MOBILE_MONEY" : "OFFLINE"));
   const ready = channelReady(wantChannel, "topup");
   if (!ready.ok) return res.status(409).json({ message: ready.message });
   const cfg = getSetting("paymentConfig", null);
   const momo = momoTopupConfig();
-  const instructions = wantChannel === "MOBILE_MONEY"
-    ? (momo.enabled === false ? "" : `Send mobile money to ${momo.number} (${momo.networkLabel}).`)
-    : (cfg?.offline?.instructions || "");
+  const publicChannels = configuredChannels();
+  const instructions = publicChannels.find((c) => c.code === wantChannel)?.instructions || "";
   const payment = {
     _id: crypto.randomUUID(),
     paymentId: paymentId(),
@@ -392,7 +423,7 @@ router.post("/wallet/topup", requireAuth, ah(async (req, res) => {
     message: `Top-up requested — ${amount} ${currency} will be credited after confirmation.`,
     payment, paymentInstructions: instructions, channels: configuredChannels(),
     walletCurrency: currency, minTopup: { amount: min, currency },
-    momo: momoTopupConfig(),
+    momo: publicMomoSummary(),
   });
 }));
 
@@ -448,6 +479,161 @@ router.get("/ledger", requireAuth, ah(async (req, res) => {
   return res.json({ entries: rows, balances: ledgerBalances(user.email) });
 }));
 
+/* ------------------------------ member: payment detail + mobile money ------------------------------ */
+
+/** GET /api/payments/:id — own payment + payment-scoped mobile-money data (public only). */
+router.get("/payments/:id", requireAuth, ah(async (req, res) => {
+  const user = memberByToken(req);
+  const payment = (db.data.payments || []).find((x) => (x._id === req.params.id || x.paymentId === req.params.id) && x.customerEmail === user.email);
+  if (!payment) return res.status(404).json({ message: "Payment not found." });
+  const out = { payment };
+  if (payment.provider === "MPESA" || payment.channel === "MPESA") {
+    out.providerPayment = {
+      provider: "MPESA",
+      status: payment.status,
+      checkoutRequestId: payment.checkoutRequestId || null,
+      merchantRequestId: payment.merchantRequestId || null,
+      receipt: payment.providerReceipt || null,
+      providerResultCode: payment.providerResultCode ?? null,
+      providerResultDesc: payment.providerResultDesc || null,
+      phoneMasked: payment.phoneMasked || null,
+      settlementAmount: payment.settlementAmount ?? payment.amount,
+      settlementCurrency: payment.settlementCurrency || payment.currency || "KES",
+      message: payment.status === "PAID"
+        ? "Payment confirmed."
+        : payment.status === "PROCESSING"
+          ? "Waiting for confirmation — check your phone and enter your M-Pesa PIN."
+          : payment.status === "CANCELLED"
+            ? "Payment was cancelled."
+            : payment.status === "EXPIRED"
+              ? "Payment request expired — try again."
+              : payment.status === "FAILED"
+                ? "Payment failed. Try again or contact finance."
+                : "Ready to start the M-Pesa payment.",
+    };
+  }
+  if (payment.channel === "MOBILE_MONEY" && ["PENDING", "PAYMENT_SUBMITTED"].includes(payment.status)) {
+    const momo = momoTopupConfig();
+    const invoice = payment.invoiceId ? (db.data.invoices || []).find((i) => i._id === payment.invoiceId) : null;
+    out.mobileMoney = {
+      method: "MOBILE_MONEY_MANUAL",
+      network: momo.networkLabel,
+      amount: payment.amount,
+      currency: payment.currency || "USD",
+      ussd: publicUssd(payment.amount, momo.ussdTemplate),
+      qrUrl: `/api/payments/${payment._id}/mobile-money-qr`,
+      dialUrl: `/api/payments/${payment._id}/mobile-money-dial`,
+      invoiceReference: invoice?.invoiceId || payment.paymentId,
+    };
+  }
+  return res.json(out);
+}));
+
+/**
+ * GET /api/payments/:id/mobile-money-qr — server-rendered QR image (owner
+ * only). The dial payload (incl. settlement routing) is built on the backend;
+ * the browser only ever receives the image, so the receive number never
+ * enters frontend state, bundles, or logs.
+ */
+router.get("/payments/:id/mobile-money-qr", requireAuth, ah(async (req, res) => {
+  const user = memberByToken(req);
+  const payment = (db.data.payments || []).find((x) => (x._id === req.params.id || x.paymentId === req.params.id) && x.customerEmail === user.email);
+  if (!payment || payment.channel !== "MOBILE_MONEY" || !["PENDING", "PAYMENT_SUBMITTED"].includes(payment.status)) {
+    return res.status(404).json({ message: "Payment not found." });
+  }
+  const momo = momoTopupConfig();
+  const dial = privateUssd(payment.amount, momo.dialTemplate || MOMO_DIAL_DEFAULT, momo.number);
+  try {
+    const png = await QRCode.toBuffer(ussdTelUri(dial), { type: "png", width: 520, margin: 1, errorCorrectionLevel: "M" });
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "private, no-store");
+    return res.send(png);
+  } catch (err) {
+    console.error("[qr] generation failed:", err?.message ?? err);
+    return res.status(500).json({ message: "QR generation failed." });
+  }
+}));
+
+/**
+ * GET /api/payments/:id/mobile-money-dial — on-tap tel: URI (owner only).
+ * Returned only when the member presses "Pay on phone"; never listed, never
+ * cached.
+ */
+router.get("/payments/:id/mobile-money-dial", requireAuth, ah(async (req, res) => {
+  const user = memberByToken(req);
+  const payment = (db.data.payments || []).find((x) => (x._id === req.params.id || x.paymentId === req.params.id) && x.customerEmail === user.email);
+  if (!payment || payment.channel !== "MOBILE_MONEY" || !["PENDING", "PAYMENT_SUBMITTED"].includes(payment.status)) {
+    return res.status(404).json({ message: "Payment not found." });
+  }
+  const momo = momoTopupConfig();
+  const dial = privateUssd(payment.amount, momo.dialTemplate || MOMO_DIAL_DEFAULT, momo.number);
+  res.setHeader("Cache-Control", "no-store");
+  return res.json({ telUri: ussdTelUri(dial) });
+}));
+
+/**
+ * POST /api/payments/:id/submit — member submits their transaction reference
+ * after paying. NEVER marks the payment paid: it moves PENDING →
+ * PAYMENT_SUBMITTED for finance verification. Duplicate references are
+ * rejected globally (one reference can never credit two payments).
+ */
+router.post("/payments/:id/submit", requireAuth, proofUpload.single("screenshot"), ah(async (req, res) => {
+  const user = memberByToken(req);
+  const payment = (db.data.payments || []).find((x) => (x._id === req.params.id || x.paymentId === req.params.id) && x.customerEmail === user.email);
+  if (!payment) return res.status(404).json({ message: "Payment not found." });
+  if (!["PENDING", "PROCESSING"].includes(payment.status)) {
+    return res.status(409).json({ message: `This payment is ${payment.status} — it cannot accept a submission now.` });
+  }
+  if (!["MOBILE_MONEY", "OFFLINE"].includes(payment.channel)) {
+    return res.status(409).json({ message: "Submissions are only for manual payment channels." });
+  }
+  const reference = String(req.body.reference || "").trim().toUpperCase();
+  const cleanup = () => { if (req.file) { try { fs.unlinkSync(req.file.path); } catch { /* best effort */ } } };
+  if (reference.length < 4 || reference.length > 80 || !/^[A-Z0-9 .-]+$/.test(reference)) {
+    cleanup();
+    return res.status(400).json({ message: "Enter the transaction reference from your payment (letters, digits, dots or dashes)." });
+  }
+  const dup = (db.data.payments || []).some(
+    (q) => q._id !== payment._id && q.submission?.reference === reference && ["PAYMENT_SUBMITTED", "PAID"].includes(q.status),
+  );
+  if (dup) {
+    cleanup();
+    return res.status(409).json({ message: "This transaction reference was already used for another payment." });
+  }
+  payment.status = PAYMENT_STATUS.PAYMENT_SUBMITTED;
+  payment.submission = {
+    reference,
+    note: String(req.body.note || "").trim().slice(0, 500),
+    screenshotFile: req.file ? req.file.filename : null,
+    submittedAt: new Date().toISOString(),
+  };
+  payment.updatedAt = new Date().toISOString();
+  db.persist();
+  addAudit({ actorId: user._id, actorEmail: user.email, actorRole: user.role, action: "PAYMENT_SUBMITTED", entity: "payment", entityId: payment._id, reason: String(req.body.note || "").trim().slice(0, 300), changes: { paymentId: payment.paymentId, reference, screenshot: Boolean(req.file) } });
+  for (const admin of (db.data.users || []).filter((u) => u.role === "admin")) {
+    emailMember(admin.email, `Payment ${payment.paymentId} submitted for verification`,
+      `<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto"><h2>SwiftKifisha</h2>
+      <p>${user.email} submitted reference <strong>${reference}</strong> for ${payment.amount} ${payment.currency || "USD"} (${payment.paymentId}).</p>
+      <p>Verify it in the admin Payments queue.</p></div>`);
+  }
+  emailMember(user.email, `Payment ${payment.paymentId} submitted`,
+    `<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto"><h2>SwiftKifisha</h2>
+     <p>We received your transaction reference <strong>${reference}</strong>. Credit is added once finance confirms the payment.</p></div>`);
+  return res.json({ message: "Reference submitted — our finance team will verify your payment.", payment });
+}));
+
+/** GET /api/admin/payments/:id/screenshot/:file — finance-only proof image. */
+router.get("/admin/payments/:id/screenshot/:file", requireAuth, requireRole(FINANCE_ROLES), ah(async (req, res) => {
+  const payment = (db.data.payments || []).find((p) => p._id === req.params.id || p.paymentId === req.params.id);
+  if (!payment || payment.submission?.screenshotFile !== req.params.file) {
+    return res.status(404).json({ message: "Screenshot not found." });
+  }
+  const filePath = path.join(PROOF_DIR, String(req.params.file));
+  if (!fs.existsSync(filePath)) return res.status(404).json({ message: "Screenshot not found." });
+  res.setHeader("Content-Type", "image/" + (String(req.params.file).endsWith(".png") ? "png" : String(req.params.file).endsWith(".gif") ? "gif" : String(req.params.file).endsWith(".webp") ? "webp" : "jpeg"));
+  return fs.createReadStream(filePath).pipe(res);
+}));
+
 /* ------------------------------ admin: payments ------------------------------ */
 
 router.get("/admin/payments", requireAuth, requireRole(FINANCE_ROLES), ah(async (req, res) => {
@@ -466,7 +652,7 @@ router.post("/admin/payments/:id/verify", requireAuth, requireRole(FINANCE_ROLES
   const payment = (db.data.payments || []).find((p) => p._id === req.params.id || p.paymentId === req.params.id);
   if (!payment) return res.status(404).json({ message: "Payment not found." });
   const reason = String((req.body || {}).reason || "").trim().slice(0, 300);
-  const reference = String((req.body || {}).reference || "").trim().slice(0, 120);
+  const reference = String((req.body || {}).reference || payment.submission?.reference || "").trim().slice(0, 120);
   if (!reason) return res.status(400).json({ message: "A verification reason is required (finance audit)." });
   if (payment.status === "PAID") return res.json({ message: "Payment already verified.", payment, invoice: null, shipment: null });
   if (!canPayTransition(payment.status, "PAID")) {
@@ -511,8 +697,9 @@ router.post("/admin/payments/:id/reject", requireAuth, requireRole(FINANCE_ROLES
   if (!payment) return res.status(404).json({ message: "Payment not found." });
   const reason = String((req.body || {}).reason || "").trim().slice(0, 300);
   if (!reason) return res.status(400).json({ message: "A rejection reason is required." });
-  if (!canPayTransition(payment.status, "FAILED")) return res.status(409).json({ message: `Cannot reject a payment in ${payment.status}.` });
-  payment.status = "FAILED";
+  const target = payment.status === "PAYMENT_SUBMITTED" ? "REJECTED" : "FAILED";
+  if (!canPayTransition(payment.status, target)) return res.status(409).json({ message: `Cannot reject a payment in ${payment.status}.` });
+  payment.status = target;
   payment.rejectReason = reason;
   payment.updatedAt = new Date().toISOString();
   db.persist();
@@ -563,7 +750,32 @@ router.post("/admin/wallet/credit", requireAuth, requireRole(FINANCE_ROLES), ah(
 
 router.get("/admin/payment-config", requireAuth, requireRole(FINANCE_ROLES), ah(async (req, res) => {
   const cfg = getSetting("paymentConfig", { offline: { enabled: true, instructions: "" } });
-  return res.json({ config: cfg, channels: configuredChannels(), providers: describeAllProviders(), momo: momoTopupConfig() });
+  const momo = momoTopupConfig();
+  const reveal = req.query.reveal === "true";
+  // config echoes the stored settings: strip private settlement fields unless
+  // an authorized finance admin explicitly reveals them.
+  const viewCfg = { ...cfg };
+  if (cfg?.momo) {
+    viewCfg.momo = { ...cfg.momo };
+    if (!reveal) {
+      delete viewCfg.momo.number;
+      delete viewCfg.momo.dialTemplate;
+    }
+  }
+  return res.json({
+    config: viewCfg,
+    channels: configuredChannels(),
+    providers: describeAllProviders(),
+    momo: {
+      enabled: momo.enabled !== false,
+      network: momo.network || "MTN",
+      networkLabel: momo.networkLabel,
+      ussdTemplate: momo.ussdTemplate,
+      dialConfigured: Boolean(momo.dialTemplate),
+      maskedNumber: maskedNumber(momo.number),
+      ...(reveal ? { number: momo.number, dialTemplate: momo.dialTemplate || MOMO_DIAL_DEFAULT } : {}),
+    },
+  });
 }));
 
 /** PUT /api/admin/payment-config — admin supplies REAL payment instructions. */
@@ -583,11 +795,23 @@ router.put("/admin/payment-config", requireAuth, requireRole(FINANCE_ROLES), ah(
     }
   }
   const prevMomo = prev?.momo || {};
+  const current = momoTopupConfig();
+  const wantNumber = String(b.momo?.number ?? prevMomo.number ?? "").trim().slice(0, 24) || current.number;
+  const wantUssd = String(b.momo?.ussdTemplate ?? prevMomo.ussdTemplate ?? "").trim().slice(0, 120) || current.ussdTemplate;
+  const publicErr = validPublicUssdTemplate(wantUssd, wantNumber);
+  if (publicErr) return res.status(400).json({ message: publicErr });
+  let dial = String(b.momo?.dialTemplate ?? prevMomo.dialTemplate ?? "").trim().slice(0, 160);
+  if (dial && !dial.includes("{amount}")) {
+    return res.status(400).json({ message: "The private dial template must contain the {amount} placeholder." });
+  }
+  const network = String(b.momo?.network ?? prevMomo.network ?? current.network ?? "MTN").trim().toUpperCase().slice(0, 12);
   const momo = {
     enabled: b.momo?.enabled !== undefined ? b.momo.enabled === true : prevMomo.enabled !== false,
-    number: String(b.momo?.number || prevMomo.number || "").trim().slice(0, 24) || momoTopupConfig().number,
-    networkLabel: String(b.momo?.networkLabel || prevMomo.networkLabel || "").trim().slice(0, 60) || momoTopupConfig().networkLabel,
-    ussdTemplate: String(b.momo?.ussdTemplate || prevMomo.ussdTemplate || "").trim().slice(0, 120) || momoTopupConfig().ussdTemplate,
+    number: wantNumber,
+    network,
+    networkLabel: String(b.momo?.networkLabel ?? prevMomo.networkLabel ?? "").trim().slice(0, 60) || (network === "AIRTEL" ? "Airtel Money (Uganda)" : "MTN Mobile Money (Uganda)"),
+    ussdTemplate: wantUssd,
+    ...(dial ? { dialTemplate: dial } : {}),
   };
   const value = { offline, channels, momo };
   setSetting("paymentConfig", value);
@@ -715,6 +939,207 @@ router.delete("/admin/pricing-rules/:id", requireAuth, requireRole(FINANCE_ROLES
 }));
 
 
+/* ------------------------------ M-Pesa (Daraja) — real provider ------------------------------ */
+
+// In-memory rate limiting (single-instance dev deployment): initiation 5/min
+// per user; provider refresh 1 per 20 s per payment.
+const mpesaInitHits = new Map();
+const mpesaRefreshAt = new Map();
+
+function hitRate(key, max, windowMs) {
+  const now = Date.now();
+  const arr = (mpesaInitHits.get(key) || []).filter((t) => now - t < windowMs);
+  if (arr.length >= max) return false;
+  arr.push(now);
+  mpesaInitHits.set(key, arr);
+  return true;
+}
+
+/** Server-side currency settlement for an M-Pesa payment. */
+function mpesaSettlement(payment) {
+  const cur = String(process.env.MPESA_CURRENCY || "KES").toUpperCase();
+  if ((payment.currency || "USD") === cur) {
+    return { settlementAmount: Math.round(payment.amount), settlementCurrency: cur, rate: null, sourceAmount: payment.amount, sourceCurrency: payment.currency };
+  }
+  let rate = null;
+  if (payment.currency === "UGX") rate = Number(ruleValue("mpesa.rateUgx", 0));
+  else if (payment.currency === "USD") rate = Number(ruleValue("mpesa.rateUsd", 0));
+  if (!(rate > 0)) {
+    return { error: `M-Pesa charges in ${cur}. Add an explicit backend rate rule (mpesa.rateUgx or mpesa.rateUsd) to convert ${payment.currency} — no silent conversion.` };
+  }
+  const settlement = Math.round(payment.amount / rate);
+  return { settlementAmount: settlement, settlementCurrency: cur, rate, sourceAmount: payment.amount, sourceCurrency: payment.currency };
+}
+
+/** Applies a VERIFIED provider success exactly once (idempotent). */
+function applyProviderPaid(payment, { receipt, providerCode, providerDesc, at }) {
+  if (payment.status === "PAID") return { already: true };
+  if (receipt) {
+    const dup = (db.data.payments || []).some(
+      (q) => q._id !== payment._id && q.providerReceipt === receipt && q.status === "PAID",
+    );
+    if (dup) return { duplicate: true };
+  }
+  payment.status = "PAID";
+  payment.providerReceipt = receipt || payment.providerReceipt || null;
+  payment.providerResultCode = providerCode != null ? providerCode : payment.providerResultCode ?? null;
+  payment.providerResultDesc = providerDesc || payment.providerResultDesc || "";
+  payment.verifiedBy = "mpesa-callback";
+  payment.paidAt = at || new Date().toISOString();
+  payment.updatedAt = new Date().toISOString();
+  db.persist();
+  let ledger = null;
+  let invoice = null;
+  let shipment = null;
+  if (payment.invoiceId) {
+    const applied = applyPaymentToInvoice(payment);
+    invoice = applied.invoice;
+    shipment = applied.shipment;
+    db.persist();
+  } else if (payment.type === "TOPUP" || !payment.invoiceId) {
+    ledger = addLedger({
+      email: payment.customerEmail, type: "CREDIT", amount: payment.amount,
+      currency: payment.currency || "USD",
+      reason: `M-Pesa payment ${payment.paymentId}${receipt ? ` (receipt ${receipt})` : ""}`,
+      refType: "payment", refId: payment._id, actor: "mpesa-callback",
+    });
+  }
+  addAudit({ actorId: null, actorEmail: "mpesa-callback", actorRole: "provider", action: "PAYMENT_CONFIRMED", entity: "payment", entityId: payment._id, changes: { paymentId: payment.paymentId, receipt, code: providerCode, description: String(providerDesc || "").slice(0, 200), invoiceId: invoice?.invoiceId || null, ledger: ledger?._id || null } });
+  emailMember(payment.customerEmail, `M-Pesa payment ${payment.paymentId} confirmed`,
+    `<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto"><h2>SwiftKifisha</h2><p>Your M-Pesa payment of <strong>${payment.amount} ${payment.currency || "USD"}</strong> was confirmed${receipt ? ` (receipt ${receipt})` : ""}.${invoice ? ` Invoice ${invoice.invoiceId} settled.` : " Wallet credited."}</p></div>`);
+  return { payment, ledger, invoice, shipment };
+}
+
+/**
+ * POST /api/payments/mpesa/stk-push { paymentId, phoneNumber } — member
+ * initiates a REAL M-Pesa STK push. Amount comes from the stored payment
+ * record ONLY; the frontend can never influence it.
+ */
+router.post("/payments/mpesa/stk-push", requireAuth, ah(async (req, res) => {
+  const user = memberByToken(req);
+  if (!hitRate("mpesa:" + user._id, 5, 60000)) {
+    return res.status(429).json({ message: "Too many M-Pesa requests — wait a minute and try again." });
+  }
+  const payment = (db.data.payments || []).find((x) => (x._id === req.body.paymentId || x.paymentId === req.body.paymentId) && x.customerEmail === user.email);
+  if (!payment) return res.status(404).json({ message: "Payment not found." });
+  if (payment.channel !== "MPESA") return res.status(409).json({ message: "This payment is not an M-Pesa payment." });
+  if (!["PENDING", "EXPIRED", "FAILED"].includes(payment.status)) {
+    return res.status(409).json({ message: `This payment is ${payment.status} — it cannot start a new M-Pesa request.` });
+  }
+  if (!mpesaConfigured()) {
+    return res.status(503).json({ message: "M-Pesa is not fully configured yet (shortcode required). Try again later." });
+  }
+  const msisdn = normalizeMsisdn(String(req.body.phoneNumber || ""));
+  if (!msisdn) return res.status(400).json({ message: "Enter a valid M-Pesa phone number (e.g. 0712XXXXXX or +2547XXXXXXXX)." });
+  const settle = mpesaSettlement(payment);
+  if (settle.error) return res.status(400).json({ message: settle.error });
+  const accountRef = String(payment.paymentId || "SwiftKifisha").slice(0, 12);
+  try {
+    const pushed = await initiateStkPush({
+      phoneNumber: msisdn,
+      amount: settle.settlementAmount,
+      accountReference: accountRef,
+      transactionDesc: payment.type === "TOPUP" ? "Wallet topup" : "Shipping invoice",
+    });
+    payment.status = "PROCESSING";
+    payment.provider = "MPESA";
+    payment.providerRequestId = pushed.merchantRequestId || null;
+    payment.checkoutRequestId = pushed.checkoutRequestId || null;
+    payment.merchantRequestId = pushed.merchantRequestId || null;
+    payment.providerResultCode = pushed.responseCode ?? null;
+    payment.providerResultDesc = pushed.responseDescription || null;
+    payment.phoneMasked = msisdn.slice(0, 6) + "****" + msisdn.slice(-2);
+    payment.sourceAmount = settle.sourceAmount;
+    payment.sourceCurrency = settle.sourceCurrency;
+    payment.rate = settle.rate;
+    payment.settlementAmount = settle.settlementAmount;
+    payment.settlementCurrency = settle.settlementCurrency;
+    payment.updatedAt = new Date().toISOString();
+    db.persist();
+    addAudit({ actorId: user._id, actorEmail: user.email, actorRole: user.role, action: "STK_REQUEST_ACCEPTED", entity: "payment", entityId: payment._id, changes: { paymentId: payment.paymentId, checkoutRequestId: payment.checkoutRequestId, responseCode: pushed.responseCode, settlementAmount: settle.settlementAmount, settlementCurrency: settle.settlementCurrency, phoneMasked: payment.phoneMasked } });
+    return res.status(201).json({
+      paymentId: payment.paymentId,
+      status: "PROCESSING",
+      message: "Check your phone and enter your M-Pesa PIN to complete the payment.",
+      checkoutRequestId: payment.checkoutRequestId,
+    });
+  } catch (err) {
+    console.error("[mpesa] stk push failed:", err?.message ?? err);
+    return res.status(502).json({ message: "Unable to start the M-Pesa payment. Check your phone number and try again." });
+  }
+}));
+
+/**
+ * POST /api/payments/mpesa/callback — PUBLIC Daraja callback URL.
+ * Configure this exact URL as MPESA_CALLBACK_URL. Verified by
+ * CheckoutRequestID + amount + receipt; idempotent by design.
+ */
+router.post("/payments/mpesa/callback", ah(async (req, res) => {
+  const parsed = parseStkCallback(req.body);
+  if (!parsed) return res.status(400).json({ message: "Unrecognized callback payload." });
+  const payment = (db.data.payments || []).find((x) => x.checkoutRequestId === parsed.checkoutRequestId);
+  // Always ACK quickly so Daraja stops retrying; unknown callbacks are logged.
+  if (!payment) {
+    console.warn(`[mpesa] callback for unknown checkout ${parsed.checkoutRequestId} ignored.`);
+    return res.json({ ResultCode: 0, ResultDesc: "Success" });
+  }
+  const target = parsed.resultCode === 0 ? "PAID" : MPESA_RESULT_MAP[parsed.resultCode] || "FAILED";
+  payment.providerResultCode = parsed.resultCode;
+  payment.providerResultDesc = String(parsed.resultDesc || "").slice(0, 300);
+  payment.providerReceipt = parsed.receiptNumber || payment.providerReceipt || null;
+  payment.updatedAt = new Date().toISOString();
+  addAudit({ actorId: null, actorEmail: "mpesa-callback", actorRole: "provider", action: "CALLBACK_RECEIVED", entity: "payment", entityId: payment._id, changes: { paymentId: payment.paymentId, checkoutRequestId: parsed.checkoutRequestId, resultCode: parsed.resultCode, resultDesc: String(parsed.resultDesc || "").slice(0, 200), receipt: parsed.receiptNumber } });
+  if (target === "PAID") {
+    const expected = payment.settlementAmount ?? Math.round(payment.amount);
+    if (parsed.amount != null && parsed.amount !== expected) {
+      payment.status = "FAILED";
+      payment.providerResultDesc = `${payment.providerResultDesc || ""} Amount mismatch (expected ${expected} ${payment.settlementCurrency || ""}, got ${parsed.amount}).`;
+      db.persist();
+      addAudit({ actorId: null, actorEmail: "mpesa-callback", actorRole: "provider", action: "PAYMENT_FAILED", entity: "payment", entityId: payment._id, changes: { paymentId: payment.paymentId, reason: "amount mismatch" } });
+      return res.json({ ResultCode: 0, ResultDesc: "Success" });
+    }
+    applyProviderPaid(payment, { receipt: parsed.receiptNumber, providerCode: 0, providerDesc: parsed.resultDesc, at: new Date().toISOString() });
+  } else {
+    payment.status = target; // CANCELLED | EXPIRED | FAILED (provider code preserved)
+    payment.updatedAt = new Date().toISOString();
+    db.persist();
+    addAudit({ actorId: null, actorEmail: "mpesa-callback", actorRole: "provider", action: `PAYMENT_${target}`, entity: "payment", entityId: payment._id, changes: { paymentId: payment.paymentId, resultCode: parsed.resultCode, resultDesc: String(parsed.resultDesc || "").slice(0, 200) } });
+  }
+  return res.json({ ResultCode: 0, ResultDesc: "Success" });
+}));
+
+/** POST /api/payments/:id/refresh — owner-triggered Daraja status query (throttled). */
+router.post("/payments/:id/refresh", requireAuth, ah(async (req, res) => {
+  const user = memberByToken(req);
+  const payment = (db.data.payments || []).find((x) => (x._id === req.params.id || x.paymentId === req.params.id) && x.customerEmail === user.email);
+  if (!payment) return res.status(404).json({ message: "Payment not found." });
+  if (payment.provider !== "MPESA" || !payment.checkoutRequestId || !["PENDING", "PROCESSING"].includes(payment.status)) {
+    return res.status(409).json({ message: "This payment cannot be refreshed." });
+  }
+  const last = mpesaRefreshAt.get(payment._id) || 0;
+  if (Date.now() - last < 20000) return res.status(429).json({ message: "Wait a few seconds before refreshing." });
+  mpesaRefreshAt.set(payment._id, Date.now());
+  try {
+    const raw = await queryStkStatus({ checkoutRequestId: payment.checkoutRequestId });
+    const parsed = parseStkCallback(raw);
+    if (!parsed) return res.json({ paymentId: payment.paymentId, status: payment.status, message: "No update yet — still waiting for confirmation." });
+    if (parsed.resultCode === 0) {
+      applyProviderPaid(payment, { receipt: parsed.receiptNumber, providerCode: 0, providerDesc: parsed.resultDesc, at: new Date().toISOString() });
+      return res.json({ paymentId: payment.paymentId, status: "PAID", message: "Payment confirmed." });
+    }
+    const target = MPESA_RESULT_MAP[parsed.resultCode] || "FAILED";
+    payment.status = target;
+    payment.providerResultCode = parsed.resultCode;
+    payment.providerResultDesc = String(parsed.resultDesc || "").slice(0, 300);
+    payment.updatedAt = new Date().toISOString();
+    db.persist();
+    return res.json({ paymentId: payment.paymentId, status: target, message: parsed.resultDesc || "No update yet." });
+  } catch (err) {
+    console.error("[mpesa] refresh failed:", err?.message ?? err);
+    return res.status(502).json({ message: "M-Pesa is not responding right now — we are still waiting for confirmation." });
+  }
+}));
+
 /* ------------------------------ provider webhooks (prepared) ------------------------------ */
 
 /**
@@ -736,6 +1161,12 @@ router.post("/payments/webhooks/:provider", ah(async (req, res) => {
     const status = err?.statusCode === 503 ? 503 : 400;
     return res.status(status).json({ message });
   }
+}));
+
+/** POST /api/admin/providers/mpesa/test-connection — finance connectivity check (no charges). */
+router.post("/admin/providers/mpesa/test-connection", requireAuth, requireRole(FINANCE_ROLES), ah(async (req, res) => {
+  const result = await testDarajaConnection();
+  return res.json({ message: result.configured ? "Test finished — see results." : "M-Pesa credentials are not fully configured.", ...result });
 }));
 
 export default router;
