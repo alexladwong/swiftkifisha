@@ -256,3 +256,17 @@ export const fetchRestrictedCategories = async () => {
   const { data } = await axiosInstance.get("/restricted/categories", { headers: auth() });
   return data; // { categories: [{ code, label, note }], note }
 };
+
+/* ------------------------- Flutterwave ------------------------- */
+
+/** POST /payments/:id/flutterwave-pay → { redirectUrl } (server-verified later). */
+export const startFlutterwavePayment = async (idOrPaymentId) => {
+  const { data } = await axiosInstance.post(`/payments/${idOrPaymentId}/flutterwave-pay`, {}, { headers: auth() });
+  return data; // { paymentId, status, redirectUrl, message }
+};
+
+/** GET /payments/:id/flutterwave-verify — server-side verification after return. */
+export const verifyFlutterwavePayment = async (idOrPaymentId) => {
+  const { data } = await axiosInstance.get(`/payments/${idOrPaymentId}/flutterwave-verify`, { headers: auth() });
+  return data; // { paymentId, status, message }
+};

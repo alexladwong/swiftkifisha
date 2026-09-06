@@ -355,6 +355,20 @@ function PaymentConfigCard() {
     }
   };
 
+  /** Finance: Flutterwave connectivity test (no charge). */
+  const [flwBusy, setFlwBusy] = useState(false);
+  const testFlutterwave = async () => {
+    setFlwBusy(true);
+    try {
+      const { data } = await axiosInstance.post("/admin/providers/flutterwave/test-connection");
+      toast.success(data?.ok ? `Flutterwave connected (${data.env})` : `Flutterwave check failed — ${data?.message || ""}`);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Flutterwave test failed.");
+    } finally {
+      setFlwBusy(false);
+    }
+  };
+
   /** Finance: run the real Daraja OAuth connectivity test (no charges). */
   const [testBusy, setTestBusy] = useState(false);
   const testMpesa = async () => {
@@ -668,6 +682,28 @@ function PaymentConfigCard() {
                             )}
                           </p>
                           <p className="font-mono text-[11px] text-muted-foreground">{pr.code}</p>
+                          {pr.code === "FLUTTERWAVE" && (
+                            <div className="mt-1 space-y-0.5 text-[11.5px] text-muted-foreground">
+                              <p>
+                                Mode: <span className="font-semibold text-foreground">{pr.env || "Test"}</span>
+                                {pr.publicKeyMasked ? (
+                                  <>
+                                    {" · Public key: "}
+                                    <span className="font-mono">{pr.publicKeyMasked}</span>
+                                  </>
+                                ) : null}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={testFlutterwave}
+                                disabled={flwBusy}
+                                className="inline-flex items-center gap-1 font-bold text-primary hover:underline disabled:opacity-60"
+                              >
+                                {flwBusy && <LoaderCircle className="h-3 w-3 animate-spin" />}
+                                Test connection (no charge)
+                              </button>
+                            </div>
+                          )}
                           {pr.code === "MPESA" && (
                             <div className="mt-1 space-y-0.5 text-[11.5px] text-muted-foreground">
                               <p>

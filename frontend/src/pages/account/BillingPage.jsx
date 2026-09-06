@@ -20,7 +20,7 @@ import {
   cancelInvoice, cancelPayment, payInvoiceFromWallet, topUpWallet,
   fetchReferralInfo, fetchReferralPoints, redeemReferralPoints,
   fetchPayment, submitPaymentReference, fetchBlobUrl, fetchDialUri,
-  startMpesaPush, refreshPayment,
+  startMpesaPush, refreshPayment, startFlutterwavePayment, verifyFlutterwavePayment,
 } from "@/lib/portalApi";
 
 /* Status chip palettes — soft background + readable text, same family as the package pages. */
@@ -58,6 +58,7 @@ const CHANNEL_LABEL = {
   OFFLINE: "Bank transfer / offline",
   WALLET: "Account credit",
   MPESA: "M-Pesa (Daraja)",
+  FLUTTERWAVE: "Flutterwave (Card / Mobile Money)",
 };
 
 const humanize = (s) =>
@@ -312,7 +313,31 @@ function PaymentPayDialog({ payment, onClose, onDone }) {
   const mm = detail?.mobileMoney || null;
   const prov = detail?.providerPayment || null;
   const st = detail?.payment?.status;
+  const chan = detail?.payment?.channel;
+  const isFlw = Boolean(prov?.provider === "FLUTTERWAVE" || chan === "FLUTTERWAVE");
+  const isMpesa = Boolean(prov?.provider === "MPESA" || chan === "MPESA");
   const manualChannel = detail?.payment?.channel === "MOBILE_MONEY" || detail?.payment?.channel === "OFFLINE";
+
+  /* Flutterwave return: ?flw=1&payment=SKP-… → server-side verify once. */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const flw = params.get("flw");
+    const payId = params.get("payment");
+    if (flw === "1" && payId) {
+      verifyFlutterwavePayment(payId)
+        .then((res) => {
+          if (res?.status === "PAID") toast.success(res.message || "Payment confirmed.");
+          else if (res?.status === "FAILED") toast.error(res.message || "Payment failed.");
+          else if (res?.message) toast.info(res.message);
+          refreshAll();
+        })
+        .catch(() => { /* surface via row states */ })
+        .finally(() => {
+          try { window.history.replaceState({}, "", window.location.pathname); } catch { /* ignore */ }
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* M-Pesa: phone + start/retry state and light polling of OUR backend only. */
   const [phone, setPhone] = useState("");
@@ -353,6 +378,35 @@ function PaymentPayDialog({ payment, onClose, onDone }) {
       setDone(null);
     } catch (err) {
       setMpesaError(err?.response?.data?.message || "Unable to start the M-Pesa payment. Check your phone number and try again.");
+    } finally {
+      setMpesaBusy(false);
+    }
+  };
+
+  const startFlw = async () => {
+    setMpesaBusy(true);
+    setMpesaError("");
+    try {
+      const res = await startFlutterwavePayment(paymentId);
+      toast.info(res.message || "Continue on Flutterwave to complete payment.");
+      window.location.href = res.redirectUrl; // hosted page
+    } catch (err) {
+      setMpesaError(err?.response?.data?.message || "Unable to start the Flutterwave payment. Try again.");
+    } finally {
+      setMpesaBusy(false);
+    }
+  };
+
+  const verifyFlw = async () => {
+    setMpesaBusy(true);
+    setMpesaError("");
+    try {
+      const res = await verifyFlutterwavePayment(paymentId);
+      const fresh = await fetchPayment(paymentId);
+      setDetail(fresh);
+      if (res?.message) toast.info(res.message);
+    } catch (err) {
+      setMpesaError(err?.response?.data?.message || "Flutterwave is not responding right now — try again shortly.");
     } finally {
       setMpesaBusy(false);
     }
@@ -420,6 +474,8 @@ function PaymentPayDialog({ payment, onClose, onDone }) {
   return (
     <Dialog open onOpenChange={(o) => !o && !submitting && onClose()}>
       <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-md sm:max-w-xl rounded-2xl max-h-[86vh] overflow-y-auto overscroll-contain">
+        <DialogTitle className="sr-only">Payment {paymentId}</DialogTitle>
+        <DialogDescription className="sr-only">Pay and confirm this payment.</DialogDescription>
         {busy ? (
           <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading payment…
@@ -529,7 +585,65 @@ function PaymentPayDialog({ payment, onClose, onDone }) {
               </>
             ) : null}
 
-            {!done && prov ? (
+            {!done && isFlw ? (
+              prov.status === "PAID" ? (
+                <div className="flex gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3.5">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                  <p className="text-[13.5px] font-semibold leading-relaxed text-emerald-800">
+                    {prov.message || "Payment confirmed."}
+                    {prov.receipt && <span className="mt-1 block font-mono text-[12.5px] text-emerald-700">Reference: {prov.receipt}</span>}
+                  </p>
+                </div>
+              ) : prov.status === "PROCESSING" ? (
+                <div className="space-y-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3.5">
+                  <div className="flex items-start gap-3">
+                    <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-sky-600" />
+                    <div>
+                      <p className="text-[14px] font-bold text-sky-900">Waiting for confirmation</p>
+                      <p className="mt-0.5 text-[13px] leading-relaxed text-sky-800">
+                        {prov.message || "Continue on the Flutterwave page if it did not open."}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={verifyFlw}
+                        disabled={mpesaBusy}
+                        className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-bold text-sky-800 underline-offset-2 hover:underline"
+                      >
+                        {mpesaBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                        Check payment status
+                      </button>
+                    </div>
+                  </div>
+                  {mpesaError && <ErrorBox message={mpesaError} />}
+                </div>
+              ) : (
+                <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-4">
+                  <p className="text-sm font-bold text-foreground">
+                    {prov.status === "FAILED" ? "Flutterwave payment failed" : "Pay with Flutterwave"}
+                  </p>
+                  <p className="text-[13px] text-slate-600">
+                    Amount due:{" "}
+                    <span className="font-bold text-foreground">{fmtAmount(detail?.payment?.amount, detail?.payment?.currency) || "—"}</span>
+                  </p>
+                  {mpesaError && <ErrorBox message={mpesaError} />}
+                  <Button
+                    type="button"
+                    onClick={startFlw}
+                    disabled={mpesaBusy}
+                    className="h-11 w-full gap-2 bg-accent font-bold text-accent-foreground hover:bg-accent/90"
+                  >
+                    {mpesaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    {mpesaBusy ? "Opening Flutterwave…" : "Pay with Flutterwave"}
+                  </Button>
+                  <p className="text-[11.5px] leading-relaxed text-slate-400">
+                    You pay on Flutterwave's secure hosted page (card or mobile money). SwiftKifisha verifies the
+                    payment with Flutterwave before crediting — nothing is credited from the browser.
+                  </p>
+                </div>
+              )
+            ) : null}
+
+            {!done && prov && !isFlw ? (
               prov.status === "PAID" ? (
                 <div className="flex gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3.5">
                   <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
@@ -568,7 +682,7 @@ function PaymentPayDialog({ payment, onClose, onDone }) {
                     {prov.message || "Payment was cancelled."}
                   </p>
                 </div>
-              ) : (
+              ) : isMpesa ? (
                 /* PENDING / FAILED / EXPIRED — start or retry an M-Pesa request */
                 <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-4">
                   <p className="text-sm font-bold text-foreground">
@@ -620,6 +734,13 @@ function PaymentPayDialog({ payment, onClose, onDone }) {
                     {mpesaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                     {mpesaBusy ? "Sending request…" : "Send payment request"}
                   </Button>
+                </div>
+              ) : (
+                <div className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+                  <p className="text-[13.5px] font-semibold leading-relaxed text-slate-700">
+                    {prov?.message || "This payment is awaiting confirmation."}
+                  </p>
                 </div>
               )
             ) : null}
@@ -870,8 +991,9 @@ export default function BillingPage() {
         const hasMobileMoney = rows.some((c) => c.code === "MOBILE_MONEY");
         const hasOffline = rows.some((c) => c.code === "OFFLINE");
         const hasMpesa = rows.some((c) => c.code === "MPESA" && c.configured === true);
-        // Backend default: MOBILE_MONEY → OFFLINE → M-Pesa.
-        setTopupChannel((cur) => cur || (hasMobileMoney ? "MOBILE_MONEY" : hasOffline ? "OFFLINE" : hasMpesa ? "MPESA" : ""));
+        const hasFlw = rows.some((c) => c.code === "FLUTTERWAVE" && c.configured === true);
+        // Backend default: MOBILE_MONEY → OFFLINE → M-Pesa → Flutterwave.
+        setTopupChannel((cur) => cur || (hasMobileMoney ? "MOBILE_MONEY" : hasOffline ? "OFFLINE" : hasMpesa ? "MPESA" : hasFlw ? "FLUTTERWAVE" : ""));
       })
       .catch(() => setTopupWalletError("Could not load your wallet — try again."))
       .finally(() => setTopupWalletBusy(false));
@@ -1016,11 +1138,12 @@ export default function BillingPage() {
   const mmChannel = topupChannelRows.find((c) => c.code === "MOBILE_MONEY") || null;
   const offlineChannel = topupChannelRows.find((c) => c.code === "OFFLINE") || null;
   const mpChannel = topupChannelRows.find((c) => c.code === "MPESA" && c.configured === true) || null;
+  const fwChannel = topupChannelRows.find((c) => c.code === "FLUTTERWAVE" && c.configured === true) || null;
   const momoConfig = topupWallet?.momo || null; // public summary {method, network, enabled} only
   const topupWalletCur = topupWallet ? topupWallet.walletCurrency || topupWallet.currency || "USD" : "USD";
   // M-Pesa (Daraja) settles in KES; other manual options use the wallet currency.
   const topupPayCur = topupChannel === "MPESA" ? "KES" : topupWalletCur;
-  const showTopupChooser = Boolean(mmChannel || offlineChannel || mpChannel);
+  const showTopupChooser = Boolean(mmChannel || offlineChannel || mpChannel || fwChannel);
   // The public code/QR for an exact amount is delivered per payment (see the
   // payment card after a top-up) — never built from private config here.
   const ussdCode = null;
@@ -1301,6 +1424,24 @@ export default function BillingPage() {
                   <span className="font-mono text-[15px] font-bold text-foreground">
                     {fmtAmount(pay.amount, pay.currency) || "—"}
                   </span>
+                  {pay.status === "PENDING" && pay.channel === "FLUTTERWAVE" && (
+                    <button
+                      type="button"
+                      onClick={() => openManualPay(pay)}
+                      className="inline-flex h-9 items-center rounded-lg bg-accent px-3 text-[13px] font-bold text-white shadow-sm transition-colors hover:bg-accent/90"
+                    >
+                      Pay with Flutterwave
+                    </button>
+                  )}
+                  {(pay.status === "PROCESSING" || pay.status === "FAILED") && pay.channel === "FLUTTERWAVE" && (
+                    <button
+                      type="button"
+                      onClick={() => openManualPay(pay)}
+                      className="inline-flex h-9 items-center rounded-lg bg-sky-50 px-3 text-[13px] font-bold text-sky-700 transition-colors hover:bg-sky-100"
+                    >
+                      {pay.status === "PROCESSING" ? "View status" : "Retry Flutterwave"}
+                    </button>
+                  )}
                   {pay.status === "PENDING" && pay.channel === "MPESA" && (
                     <button
                       type="button"
@@ -1839,7 +1980,8 @@ export default function BillingPage() {
               <DialogFooter className="sm:justify-between">
                 {(topupResult.payment?.channel === "MOBILE_MONEY" ||
                   topupResult.payment?.channel === "OFFLINE" ||
-                  topupResult.payment?.channel === "MPESA") &&
+                  topupResult.payment?.channel === "MPESA" ||
+                  topupResult.payment?.channel === "FLUTTERWAVE") &&
                 topupResult.payment?.status === "PENDING" ? (
                   <Button
                     type="button"
@@ -1851,7 +1993,7 @@ export default function BillingPage() {
                     }}
                     className="gap-2 bg-accent font-bold text-accent-foreground hover:bg-accent/90"
                   >
-                    <Smartphone className="h-4 w-4" /> {topupResult.payment?.channel === "MPESA" ? "Continue to M-Pesa" : "Scan & pay now"}
+                    <Smartphone className="h-4 w-4" /> {topupResult.payment?.channel === "MPESA" ? "Continue to M-Pesa" : topupResult.payment?.channel === "FLUTTERWAVE" ? "Continue to Flutterwave" : "Scan & pay now"}
                   </Button>
                 ) : (
                   <span />
@@ -2043,6 +2185,43 @@ export default function BillingPage() {
                           </span>
                         </button>
                       )}
+                      {fwChannel && (
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={topupChannel === "FLUTTERWAVE"}
+                          onClick={() => setTopupChannel("FLUTTERWAVE")}
+                          className={
+                            "flex w-full items-center gap-3 rounded-lg border px-3.5 py-3 text-left transition-colors " +
+                            (topupChannel === "FLUTTERWAVE"
+                              ? "border-primary/40 bg-primary/5"
+                              : "border-[#e5eaf2] bg-white hover:border-slate-300")
+                          }
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={
+                              "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 " +
+                              (topupChannel === "FLUTTERWAVE" ? "border-primary" : "border-slate-300")
+                            }
+                          >
+                            {topupChannel === "FLUTTERWAVE" && (
+                              <span className="h-2 w-2 rounded-full bg-primary" />
+                            )}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[13.5px] font-bold text-foreground">
+                              Flutterwave (Card / Mobile Money)
+                            </span>
+                            <span className="mt-0.5 block truncate text-[12px] text-slate-500">
+                              Pay on Flutterwave's secure hosted page — verified automatically
+                            </span>
+                          </span>
+                          <span className="inline-flex shrink-0 items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-emerald-700">
+                            Connected
+                          </span>
+                        </button>
+                      )}
                       {offlineChannel && (
                         <button
                           type="button"
@@ -2116,7 +2295,7 @@ export default function BillingPage() {
                     <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Payment channels</p>
                     <ul className="space-y-1.5">
                       {topupChannelRows
-                        .filter((ch) => ch.code !== "MOBILE_MONEY" && ch.code !== "OFFLINE" && !(ch.code === "MPESA" && mpChannel))
+                        .filter((ch) => ch.code !== "MOBILE_MONEY" && ch.code !== "OFFLINE" && !(ch.code === "MPESA" && mpChannel) && !(ch.code === "FLUTTERWAVE" && fwChannel))
                         .map((ch) => (
                           <ChannelStatusRow key={ch.code || ch.label || "channel"} channel={ch} />
                         ))}

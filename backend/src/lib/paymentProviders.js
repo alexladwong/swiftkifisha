@@ -35,6 +35,12 @@ export const PROVIDERS = [
     optionalEnv: ["MPESA_ENV", "MPESA_CALLBACK_URL", "MPESA_TRANSACTION_TYPE", "MPESA_CURRENCY"],
   },
   {
+    code: "FLUTTERWAVE",
+    label: "Flutterwave (Cards & Mobile Money)",
+    requiredEnv: ["FLW_SECRET_KEY", "FLW_PUBLIC_KEY"],
+    optionalEnv: ["FLW_ENCRYPTION_KEY", "FLW_ENV", "FLW_SECRET_HASH"],
+  },
+  {
     code: "CARD",
     label: "Credit / debit card",
     requiredEnv: ["STRIPE_SECRET_KEY"],
@@ -63,6 +69,8 @@ export function describeProvider(code) {
       message = "M-Pesa credentials stored — add MPESA_SHORTCODE (paybill/till) and confirm the Consumer Secret in the Safaricom portal (OAuth test currently returns 400).";
     } else if (code === "MPESA") {
       message = `M-Pesa — Connected. Environment: ${process.env.MPESA_ENV === "production" ? "Production" : "Sandbox"}.`;
+    } else if (code === "FLUTTERWAVE") {
+      message = `Flutterwave — Connected. Mode: ${process.env.FLW_ENV === "production" ? "Production" : "Test"}.`;
     } else {
       message = "Provider credentials detected — live adapter handshake required before charges (no simulated success).";
     }
@@ -81,7 +89,9 @@ export function describeProvider(code) {
           : "",
         callbackConfigured: Boolean(process.env.MPESA_CALLBACK_URL),
       }
-    : null;
+    : code === "FLUTTERWAVE"
+      ? { env: process.env.FLW_ENV === "production" ? "Production" : "Test", publicKeyMasked: String(process.env.FLW_PUBLIC_KEY || "").slice(0, 12) + "…" }
+      : null;
   return {
     code, label: p.label, integration: "api", configured,
     present: present.length, missing,
@@ -100,6 +110,9 @@ export function describeProvider(code) {
 export function providerCanInitiate(code) {
   if (code === "MPESA") {
     return Boolean(process.env.MPESA_CONSUMER_KEY && process.env.MPESA_CONSUMER_SECRET && process.env.MPESA_PASSKEY && process.env.MPESA_SHORTCODE);
+  }
+  if (code === "FLUTTERWAVE") {
+    return Boolean(process.env.FLW_SECRET_KEY && process.env.FLW_PUBLIC_KEY);
   }
   return false; // MTN/Airtel/card adapters pending — never initiate
 }

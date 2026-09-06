@@ -100,6 +100,7 @@ export const CHANNELS = [
   { code: "AIRTEL_MONEY", label: "Airtel Money (Uganda)", integration: "api", provider: "airtel", topup: true, invoice: true },
   { code: "MPESA", label: "M-Pesa (Daraja)", integration: "api", provider: "mpesa", topup: true, invoice: true },
   { code: "CARD", label: "Credit / debit card", integration: "api", provider: "stripe", topup: true, invoice: true },
+  { code: "FLUTTERWAVE", label: "Flutterwave (Cards & Mobile Money)", integration: "api", provider: "flutterwave", topup: true, invoice: true },
 ];
 
 /* ------------------------------- mobile-money USSD top-up ------------------------------- */

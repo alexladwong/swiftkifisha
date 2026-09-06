@@ -95,6 +95,7 @@ export const CHANNEL_LABEL = {
   AIRTEL_MONEY: "Airtel Money (not configured)",
   CARD: "Card (not configured)",
   MPESA: "M-Pesa (Daraja)",
+  FLUTTERWAVE: "Flutterwave (Card / Mobile Money)",
 };
 
 /** Channel codes whose rows show a configure/unconfigured state in the UI. */

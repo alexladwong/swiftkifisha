@@ -27,6 +27,7 @@ import fs from "node:fs";
 import QRCode from "qrcode";
 import { describeProvider, describeAllProviders, verifyProviderWebhook, hashEvent, PROVIDER_BY_CODE, testDarajaConnection, providerCanInitiate } from "../lib/paymentProviders.js";
 import { initiateStkPush, queryStkStatus, parseStkCallback, normalizeMsisdn, mpesaConfigured, MPESA_RESULT_MAP, mpesaShortcodeSet } from "../lib/mpesa.js";
+import { createFlutterwavePayment, verifyFlutterwaveTransaction, flutterwaveConfigured, flutterwaveTestConnection as flwTest } from "../lib/flutterwave.js";
 
 const router = Router();
 const PROOF_DIR = path.join(config.root, "data", "uploads", "proofs");
@@ -545,6 +546,21 @@ router.get("/payments/:id", requireAuth, ah(async (req, res) => {
                 : "Ready to start the M-Pesa payment.",
     };
   }
+  if ((payment.provider === "FLUTTERWAVE" || payment.channel === "FLUTTERWAVE") && ["PENDING", "PROCESSING"].includes(payment.status)) {
+    out.providerPayment = {
+      provider: "FLUTTERWAVE",
+      status: payment.status,
+      checkoutRequestId: payment.checkoutRequestId || null,
+      receipt: payment.providerReceipt || null,
+      providerResultCode: payment.providerResultCode ?? null,
+      providerResultDesc: payment.providerResultDesc || null,
+      message: payment.status === "PAID"
+        ? "Payment confirmed."
+        : payment.status === "PROCESSING"
+          ? "Waiting for confirmation — continue on the Flutterwave page and we verify automatically."
+          : "Ready to pay with Flutterwave.",
+    };
+  }
   if (payment.channel === "MOBILE_MONEY" && ["PENDING", "PAYMENT_SUBMITTED"].includes(payment.status)) {
     const momo = momoTopupConfig();
     const invoice = payment.invoiceId ? (db.data.invoices || []).find((i) => i._id === payment.invoiceId) : null;
@@ -858,8 +874,8 @@ router.put("/admin/payment-config", requireAuth, requireRole(FINANCE_ROLES), ah(
   const publicErr = validPublicUssdTemplate(wantUssd, wantNumber);
   if (publicErr) return res.status(400).json({ message: publicErr });
   let dial = String(b.momo?.dialTemplate ?? prevMomo.dialTemplate ?? "").trim().slice(0, 160);
-  if (dial && !dial.includes("{amount}")) {
-    return res.status(400).json({ message: "The private dial template must contain the {amount} placeholder." });
+  if (dial && !dial.includes("{amount}") && !/^\*[0-9*#]+$/.test(dial)) {
+    return res.status(400).json({ message: "The dial template must contain the {amount} placeholder or be a plain menu code like *185*1#." });
   }
   const network = String(b.momo?.network ?? prevMomo.network ?? current.network ?? "MTN").trim().toUpperCase().slice(0, 12);
   const momo = {
@@ -995,6 +1011,135 @@ router.delete("/admin/pricing-rules/:id", requireAuth, requireRole(FINANCE_ROLES
   return res.json({ message: "Pricing rule deleted." });
 }));
 
+
+/* ------------------------------ Flutterwave (Cards & Mobile Money) ------------------------------ */
+
+const flwRefreshAt = new Map();
+
+/**
+ * POST /api/payments/:id/flutterwave-pay — member starts a Flutterwave hosted
+ * payment for THIS payment record (amount/currency from the record only).
+ */
+router.post("/payments/:id/flutterwave-pay", requireAuth, ah(async (req, res) => {
+  const user = memberByToken(req);
+  const payment = (db.data.payments || []).find((x) => (x._id === req.params.id || x.paymentId === req.params.id) && x.customerEmail === user.email);
+  if (!payment) return res.status(404).json({ message: "Payment not found." });
+  if (payment.channel !== "FLUTTERWAVE") return res.status(409).json({ message: "This payment is not a Flutterwave payment." });
+  if (!["PENDING", "FAILED"].includes(payment.status)) return res.status(409).json({ message: `This payment is ${payment.status}.` });
+  if (!flutterwaveConfigured()) return res.status(503).json({ message: "Flutterwave is not fully configured yet." });
+  const redirectBase = (process.env.FLW_REDIRECT_BASE || process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/+$/, "");
+  const redirectUrl = `${redirectBase}/account/billing?flw=1&payment=${encodeURIComponent(payment.paymentId)}`;
+  try {
+    const created = await createFlutterwavePayment({
+      amount: payment.amount,
+      currency: payment.currency || "USD",
+      email: user.email,
+      txRef: payment.paymentId,
+      redirectUrl,
+      narration: payment.type === "TOPUP" ? "Wallet top-up" : "Shipping payment",
+    });
+    payment.provider = "FLUTTERWAVE";
+    payment.status = "PROCESSING";
+    payment.providerRequestId = created.flwId != null ? String(created.flwId) : null;
+    payment.checkoutRequestId = created.txRef || null;
+    payment.updatedAt = new Date().toISOString();
+    db.persist();
+    addAudit({ actorId: user._id, actorEmail: user.email, actorRole: user.role, action: "FLUTTERWAVE_PAYMENT_STARTED", entity: "payment", entityId: payment._id, changes: { paymentId: payment.paymentId, flwId: created.flwId } });
+    return res.json({ paymentId: payment.paymentId, status: "PROCESSING", redirectUrl: created.link, message: "Continue on Flutterwave to complete payment." });
+  } catch (err) {
+    console.error("[flw] payment start failed:", err?.message ?? err);
+    return res.status(502).json({ message: "Unable to start the Flutterwave payment. Try again." });
+  }
+}));
+
+/**
+ * GET /api/payments/:id/flutterwave-verify — called after the customer returns
+ * from Flutterwave. ALWAYS verifies server-side with the secret; the browser
+ * can never mark a payment paid.
+ */
+router.get("/payments/:id/flutterwave-verify", requireAuth, ah(async (req, res) => {
+  const user = memberByToken(req);
+  const payment = (db.data.payments || []).find((x) => (x._id === req.params.id || x.paymentId === req.params.id) && x.customerEmail === user.email);
+  if (!payment || payment.provider !== "FLUTTERWAVE") return res.status(404).json({ message: "Payment not found." });
+  if (!["PENDING", "PROCESSING"].includes(payment.status)) {
+    return res.json({ paymentId: payment.paymentId, status: payment.status, message: payment.status === "PAID" ? "Payment confirmed." : "This payment is already finalised." });
+  }
+  const last = flwRefreshAt.get(payment._id) || 0;
+  if (Date.now() - last < 8000) return res.status(429).json({ message: "Wait a few seconds before checking again." });
+  flwRefreshAt.set(payment._id, Date.now());
+  try {
+    const tx = await verifyFlutterwaveTransaction({ flwId: payment.providerRequestId, txRef: payment.paymentId });
+    payment.providerResultCode = tx.status;
+    payment.providerResultDesc = String(tx.status || "").slice(0, 120);
+    payment.providerReceipt = tx.receipt || payment.providerReceipt || null;
+    payment.updatedAt = new Date().toISOString();
+    db.persist();
+    if (tx.status === "successful") {
+      const expected = payment.settlementAmount ?? payment.amount;
+      const expectedCur = payment.settlementCurrency || payment.currency;
+      if (tx.amount != null && (Number(tx.amount) !== Number(expected) || (tx.currency && tx.currency !== expectedCur))) {
+        payment.status = "FAILED";
+        payment.providerResultDesc = `Amount/currency mismatch (expected ${expected} ${expectedCur}, got ${tx.amount} ${tx.currency}).`;
+        db.persist();
+        return res.json({ paymentId: payment.paymentId, status: "FAILED", message: "Payment verification failed — amount mismatch. Contact finance." });
+      }
+      applyProviderPaid(payment, { receipt: tx.receipt, providerCode: "successful", providerDesc: "Flutterwave verified", at: new Date().toISOString() });
+      return res.json({ paymentId: payment.paymentId, status: "PAID", message: "Payment confirmed." });
+    }
+    if (tx.status === "failed" || tx.status === "cancelled") {
+      payment.status = "FAILED";
+      db.persist();
+      return res.json({ paymentId: payment.paymentId, status: "FAILED", message: "Payment failed or cancelled on Flutterwave." });
+    }
+    return res.json({ paymentId: payment.paymentId, status: payment.status, message: "We are still waiting for confirmation." });
+  } catch (err) {
+    const msg = String(err?.message || "");
+    console.error("[flw] verify failed:", msg);
+    if (msg.includes("No transaction was found")) {
+      // Payment not completed on the hosted page yet — still waiting, not an error.
+      return res.json({ paymentId: payment.paymentId, status: payment.status, message: "We are still waiting for confirmation — complete the payment on the Flutterwave page." });
+    }
+    return res.status(502).json({ message: "Flutterwave is not responding right now — try again in a few seconds." });
+  }
+}));
+
+/**
+ * POST /api/payments/webhooks/flutterwave — Flutterwave charge webhook.
+ * Body is verified server-side (secret-key transaction lookup); idempotent.
+ */
+router.post("/payments/webhooks/flutterwave", ah(async (req, res) => {
+  const body = req.body || {};
+  const data = body?.data || {};
+  const txRef = String(data?.tx_ref || body?.txRef || "");
+  const event = String(body?.event || "");
+  const payment = (db.data.payments || []).find((p) => p.paymentId === txRef);
+  if (!payment) return res.json({ status: "ignored", message: "Unknown transaction reference." });
+  addAudit({ actorId: null, actorEmail: "flutterwave-webhook", actorRole: "provider", action: "FLUTTERWAVE_WEBHOOK", entity: "payment", entityId: payment._id, changes: { paymentId: payment.paymentId, event } });
+  try {
+    const tx = await verifyFlutterwaveTransaction({ flwId: data?.id ?? null, txRef });
+    if (tx.status === "successful" && ["PENDING", "PROCESSING"].includes(payment.status)) {
+      const expected = payment.settlementAmount ?? payment.amount;
+      if (tx.amount != null && Number(tx.amount) === Number(expected)) {
+        applyProviderPaid(payment, { receipt: tx.receipt, providerCode: "successful", providerDesc: "Flutterwave webhook verified", at: new Date().toISOString() });
+      }
+    } else if ((tx.status === "failed" || tx.status === "cancelled") && ["PENDING", "PROCESSING"].includes(payment.status)) {
+      payment.status = "FAILED";
+      payment.providerResultCode = tx.status;
+      payment.providerResultDesc = "Payment failed or cancelled.";
+      payment.updatedAt = new Date().toISOString();
+      db.persist();
+    }
+  } catch (err) {
+    console.error("[flw] webhook verify failed:", err?.message ?? err);
+  }
+  return res.json({ status: "ok" });
+}));
+
+/** POST /api/admin/providers/flutterwave/test-connection — finance check (no charge). */
+router.post("/admin/providers/flutterwave/test-connection", requireAuth, requireRole(FINANCE_ROLES), ah(async (req, res) => {
+  const result = await flwTest();
+  return res.json({ message: result.ok ? "Flutterwave connected." : "Flutterwave check failed.", ...result });
+}));
 
 /* ------------------------------ M-Pesa (Daraja) — real provider ------------------------------ */
 
