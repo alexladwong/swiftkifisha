@@ -79,7 +79,13 @@ router.post("/login", ah(async (req, res) => {
     return res.status(400).json({ message: "Email and password are required." });
   }
   const user = db.data.users.find((u) => u.email === String(email).toLowerCase().trim());
-  if (!user || !(await bcrypt.compare(String(password), user.passwordHash))) {
+  if (!user) {
+    return res.status(401).json({ message: "Invalid email or password." });
+  }
+  if (!user.passwordHash) {
+    return res.status(401).json({ message: "No password is set for this account — use the email sign-in code." });
+  }
+  if (!(await bcrypt.compare(String(password), user.passwordHash))) {
     return res.status(401).json({ message: "Invalid email or password." });
   }
   const token = jwt.sign(
