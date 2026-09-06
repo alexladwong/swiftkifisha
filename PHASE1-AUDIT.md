@@ -1,6 +1,6 @@
-# SwiftKifisha — Commercial Platform Audit + Phase 1 Report
+# SwiftKifisha — Commercial Platform Audit + Phase Reports
 
-> Status: working document, updated during Phase-1 implementation.
+> Status: working document — Phase 1 (core) done, Phase 2 (money) backend done, UI in progress.
 > No mock data, no simulated carrier/payment successes. Anything requiring a
 > provider's credentials is explicitly marked **Integration prepared — provider
 > credentials required.**
@@ -138,3 +138,114 @@ Final status (this session):
 - Advisory package actions now return "Request sent to the warehouse team." (no more "moved to null").
 - Live browser rendering not exercised in this session (no browser runtime available); all pages were verified by contract review + JSX parse + production build.
 
+
+
+---
+
+# Phase 2 — MONEY (status: backend complete & verified; UI in progress)
+
+## What was added
+
+**Domain (`backend/src/lib/money.js`):** payment status machine (PENDING → PAID/FAILED/CANCELLED; PAID terminal until refund), invoice states (ISSUED/PARTIAL/PAID/VOID), shipment dispatch machine (CREATED → … → DELIVERED/EXCEPTION with staff-only transitions), immutable wallet ledger (CREDIT/DEBIT with balance recomputation), server-side invoice line builder (freight + handling + insurance + overdue storage from `pricingRules`), admin settings rows.
+
+**Collections added:** `invoices`, `payments`, `ledger`, `shipments`, `settings` — wired into db defaults, Neon `SYNC_COLLECTIONS`, and (fixed this session) the boot-pull assignment in `server.js` (the money collections were previously dropped at boot because the pull mapper did not list them — data was safe in Neon, now loads correctly).
+
+**Endpoints (`backend/src/routes/money.routes.js`):**
+- Member: `GET /billing/overview`, `POST /checkout` (server-computed pricing → Invoice ISSUED + Payment PENDING), `GET /invoices`, `GET /invoices/:id`, `POST /invoices/:id/cancel` (void unpaid), `GET /payments`, `POST /payments/:id/cancel`, `GET /wallet`, `POST /wallet/pay-invoice` (ledger-backed instant pay).
+- Admin/finance: `GET /admin/payments`, `POST /admin/payments/:id/verify` (reason+reference, audited, idempotent → marks invoice paid and creates the Shipment), `POST /admin/payments/:id/reject`, `GET /admin/invoices`, `GET /admin/invoices/:id`, `POST /admin/wallet/credit` (audited), `GET|PUT /admin/payment-config` (real payment instructions), `GET /admin/shipments`, `GET /admin/shipments/:id`, `POST /admin/shipments/:id/events` (real staff events, machine-validated), `GET|POST|PATCH|DELETE /admin/pricing-rules`.
+
+**Honesty rules enforced:** a payment becomes PAID only via finance verification with reference + reason, or a wallet debit against a real ledger balance; members can never self-mark paid; provider channels (MTN MoMo, Airtel Money, card) remain **Integration prepared — provider credentials required**; dispatch rows (SKS-…) are only created after full payment; tracking events are staff-recorded only.
+
+**UploadThing file bucket (`backend/src/lib/fileBucket.js` + commerce photo routes):** package photos now upload server-side to the UploadThing bucket (token stays in `backend/.env`, never in clients); local copies deleted only after bucket confirms; `/files/packages/:filename` still enforces owner/admin authorization and streams the object through the API (clients never see the raw bucket URL); `utUrl`/`utKey` stripped from client payloads; photos uploaded before the bucket keep working from disk.
+
+**Google sign-in fix:** production backend emitted `redirect_uri=http://localhost:5001/...` because `PUBLIC_API_URL` was unset on the prod host → Google rejected the login (`redirect_uri_mismatch`). `googleRedirectURI(req)` now falls back to the request's `X-Forwarded-Host`/`X-Forwarded-Proto` (Caddy/nginx) then `Host`, so the live API emits `https://api.eazyjobs.info/api/auth/callback/google` (the console-registered URI). Dev behavior unchanged. Google only honors console-registered URIs, so host-derived redirects cannot be abused.
+
+## Verification (live)
+- Wallet math: 200.00 credit − 39.56 debit = 160.44 balance; ledger rows immutable.
+- Checkout duplicate guard 409; invoice void (member) frees packages; wallet pay → invoice PAID + shipment SKS-… auto-created + packages SHIPMENT_CREATED with shipmentId; sibling pending payments auto-cancel on settle.
+- Finance: member verify 403; verify without reason 400; verify with reason+reference → PAID + shipment; duplicate verify idempotent (no double shipment); reject path machine-guarded.
+- Shipment events: invalid transitions 409 (e.g. PICKED_UP → DELIVERED); valid chain READY_FOR_CARRIER → PICKED_UP → IN_TRANSIT → OUT_FOR_DELIVERY → DELIVERED recorded with actor/at.
+- Bucket: photo uploaded → utKey/utUrl, local file removed, anon 401, authorized GET 200 image/png; legacy local photo still 200; client payloads contain only id/view/name/size/uploadedAt.
+- Pricing rules CRUD: create/patch/delete audited; duplicate 409.
+
+
+---
+
+# Session wrap (latest round)
+
+- **Google sign-in**: root cause for local AND production mismatch — the Google
+  OAuth console does not (yet) list the redirect URIs the backend emits.
+  Backend now derives the redirect URI from `PUBLIC_API_URL` → forwarded
+  headers → Host, so it always emits the URI that matches the mode
+  (`http://localhost:5001/api/auth/callback/google` locally,
+  `https://api.eazyjobs.info/api/auth/callback/google` behind the prod proxy —
+  verified by curl). Console action required (owner-only): register
+  `http://localhost:5001/api/auth/callback/google`,
+  `http://localhost:5173/api/auth/callback/google` (proxy mode) and
+  `https://api.eazyjobs.info/api/auth/callback/google` under the OAuth client
+  `702921110092-…`.
+- **Wallet top-up**: members top up their wallet in their detected currency
+  (Uganda → UGX, others → USD; min UGX 37 000 / USD 10 at the fixed 3700
+  rate). `POST /api/wallet/topup` creates a PENDING `type:"TOPUP"` payment;
+  finance `verify` credits the immutable ledger in the payment currency
+  (`WALLET_TOPUP_VERIFIED` audit). Billing UI: currency-aware balances, top-up
+  dialog with live minimums, purpose chips, admin Payments queue shows
+  Top-up/Invoice purpose and UGX amounts.
+- **Payment providers (prepared)**: MTN MoMo, Airtel Money, M-Pesa (Daraja)
+  and card channels now exist as a real adapter surface
+  (`backend/src/lib/paymentProviders.js`): env-only credentials, admin
+  enable/disable, per-channel readiness, no charge is ever simulated.
+  Unconfigured channels answer **"Integration prepared — provider credentials
+  required."**; card answers "Visa/Mastercard payments — coming soon (provided
+  by the bank)." A signature-verified webhook intake endpoint is stubbed
+  (`POST /api/payments/webhooks/:provider`) and returns 503 until credentials
+  exist. Checkout/top-up accept a requested channel and enforce readiness.
+- **Mobile-money USSD top-up**: receive account +256757889291 (admin-editable
+  via payment-config `momo`), default MTN MoMo template `*165*1*{amount}*{number}#`.
+  Member top-up dialog (UGX) renders a scannable QR of the USSD string with
+  the amount + receive number, copy button, network label and honest
+  "credited after finance confirms" copy; card/momo/airtel/mpesa rows are
+  locked with the provider messages.
+- **Builds**: member frontend + admin dashboard production builds pass
+  (chunk-size warnings only). i18n parity intact (342 × 5).
+- **Data state**: dev dataset consistent file ↔ Neon (users 7, members 29,
+  parcels 200, packages 4, invoices 2, payments 5, shipments 2, ledger 3,
+  settings 1). Demo/test rows remain in dev data; `backend/scripts/purge-demo-data.mjs`
+  (dry-run by default) removes @example.com rows before go-live.
+
+
+---
+
+# Session wrap 2 — admin-selectable payments, QR/USSD, referrals
+
+- **Payment options are admin-selectable (verified live)**: finance toggles
+  `MOBILE_MONEY` (manual mobile money to the receive number) and `OFFLINE`
+  (bank/manual) independently in Payments → Payment instructions; member
+  wallet/top-up payloads reflect the choice instantly (disabled options
+  disappear; top-up default = mobile money when on, else bank). API providers
+  (MTN MoMo, Airtel, M-Pesa, card) remain locked rows until real credentials
+  exist; CARD copy: "Visa/Mastercard payments — coming soon (provided by the
+  bank)."
+- **Top-up QR/USSD active (verified in source + API)**: member top-up dialog
+  offers "How do you want to pay?" — Mobile money (receive number
+  +256757889291, network label, USSD template `*165*1*{amount}*{number}#`) or
+  Bank transfer. Choosing mobile money + a valid UGX amount renders a scannable
+  QR of the USSD string (qrcode lib, same as ParcelQR) with copy button and
+  honest "credited after finance confirms" copy; the chosen channel is stored
+  on the PENDING payment and shown in Billing + admin Payments.
+- **Referral & points program (live, verified end-to-end)**: users receive a
+  unique code (SK-XXXXXX); signup accepts optional `refCode` (URL `?ref=` is
+  pre-filled into the signup dialog); when the referred member's application is
+  ACCEPTED the referrer earns 1,000 points (pricing rules
+  `referral.pointsPerReferral`, `referral.minRedeem`, `referral.pointsValueUsd`),
+  idempotent per referred user, audited + emailed. Members redeem ≥1,000 points
+  → USD wallet credit ($0.001/pt; verified 1000 pts → $1.00) which pays
+  shipping invoices via the wallet. Finance overview/adjust endpoints added
+  (`GET /admin/referrals`, `POST /admin/referrals/adjust`). New `points`
+  collection wired into db defaults, Neon sync list and boot pull.
+- **Review sweep (no regressions)**: auth (me/providers/membership), Phase-1
+  core (packages/mailboxes/overview/quotes), admin ops (warehouses/packages/
+  audit/pricing), money (billing/invoices/wallet/payments/admin invoices/
+  payments/shipments/config), comms (notifications/announcements/messages),
+  file authz (401/403/404) — all green; added missing member `GET /api/ledger`.
+- **Builds**: member frontend exit 0, dashboard exit 0; i18n parity intact.

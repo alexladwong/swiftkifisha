@@ -223,12 +223,22 @@ export default function PackagesPage() {
                           </span>
                           <StatusChip status={pkg.status} />
                         </div>
-                        <Link
-                          to={"/account/packages/" + pkg.packageId}
-                          className="inline-flex h-9 items-center gap-1 rounded-lg border border-[#e5eaf2] bg-white px-3.5 text-[13px] font-bold text-slate-700 transition-colors hover:border-primary/30 hover:text-primary"
-                        >
-                          Details <ChevronRight className="h-4 w-4" />
-                        </Link>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {pkg.status === "READY_FOR_PAYMENT" && (
+                            <Link
+                              to={"/account/checkout?package=" + encodeURIComponent(pkg.packageId)}
+                              className="inline-flex h-9 items-center gap-1 text-[13px] font-bold text-primary hover:underline"
+                            >
+                              Pay & ship <ChevronRight className="h-3.5 w-3.5" />
+                            </Link>
+                          )}
+                          <Link
+                            to={"/account/packages/" + pkg.packageId}
+                            className="inline-flex h-9 items-center gap-1 rounded-lg border border-[#e5eaf2] bg-white px-3.5 text-[13px] font-bold text-slate-700 transition-colors hover:border-primary/30 hover:text-primary"
+                          >
+                            Details <ChevronRight className="h-4 w-4" />
+                          </Link>
+                        </div>
                       </div>
 
                       <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px]">

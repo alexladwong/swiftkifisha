@@ -166,6 +166,18 @@ export function seedCommerceDefaults() {
     ];
     changed = true;
   }
+  // Referral/points program rules (append when missing).
+  const referralRules = [
+    { code: "referral.pointsPerReferral", value: 1000, unit: "points", note: "Points awarded per accepted referral" },
+    { code: "referral.minRedeem", value: 1000, unit: "points", note: "Minimum points for one redemption" },
+    { code: "referral.pointsValueUsd", value: 0.001, unit: "USD/pt", note: "Wallet credit value per redeemed point" },
+  ];
+  for (const rule of referralRules) {
+    if (!db.data.pricingRules.some((r) => r.code === rule.code)) {
+      db.data.pricingRules.push({ _id: crypto.randomUUID(), ...rule });
+      changed = true;
+    }
+  }
   if (changed) db.persist();
 }
 

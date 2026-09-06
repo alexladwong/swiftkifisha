@@ -19,6 +19,7 @@ import {
   addAudit, withIdempotency, ruleValue,
 } from "../lib/commerce.js";
 import { sendGenericEmail } from "../lib/mailer.js";
+import { bucketConfigured, uploadToBucket } from "../lib/fileBucket.js";
 
 const router = Router();
 const UPLOAD_DIR = path.join(config.root, "data", "uploads", "packages");
@@ -59,6 +60,14 @@ function freshPackageId() {
   return "SWPK-" + String(Math.floor(100000 + Math.random() * 899999));
 }
 
+
+/** Strip bucket internals (utUrl/utKey) from photo objects before any client
+ * payload — photos are served exclusively through the authorized /files route. */
+function publicPkg(p) {
+  if (!p || !Array.isArray(p.photos)) return p;
+  return { ...p, photos: p.photos.map(({ id, view, name, size, uploadedAt }) => ({ id, view, name, size, uploadedAt })) };
+}
+
 /** Legal next statuses per current state — the UI renders options from the
  * backend machine rather than duplicating transition logic. */
 function transitionsOf(p) {
@@ -73,7 +82,7 @@ router.get("/packages", requireAuth, ah(async (req, res) => {
   const status = String(req.query.status || "");
   let rows = (db.data.packages || []).filter((p) => p.customerEmail === user.email);
   if (status) rows = rows.filter((p) => p.status === status);
-  rows = rows.map((p) => ({ ...p, storage: storageInfo(p), allowedActions: allowedActionsFor(p) }));
+  rows = rows.map((p) => ({ ...publicPkg(p), storage: storageInfo(p), allowedActions: allowedActionsFor(p) }));
   rows.sort((a, b) => new Date(b.receivedAt || b.createdAt) - new Date(a.receivedAt || a.createdAt));
   return res.json({ packages: rows });
 }));
@@ -119,7 +128,7 @@ router.post("/packages/pre-alert", requireAuth, ah(async (req, res) => {
 router.get("/packages/:id", requireAuth, ah(async (req, res) => {
   const { pkg } = packageForMember(req) || {};
   if (!pkg) return res.status(404).json({ message: "Package not found." });
-  return res.json({ package: { ...pkg, storage: storageInfo(pkg), allowedActions: allowedActionsFor(pkg) } });
+  return res.json({ package: { ...publicPkg(pkg), storage: storageInfo(pkg), allowedActions: allowedActionsFor(pkg) } });
 }));
 
 /** POST /api/packages/:id/action — customer requests an action (state machine). */
@@ -141,7 +150,7 @@ router.post("/packages/:id/action", requireAuth, ah(async (req, res) => {
   pkg.updatedAt = new Date().toISOString();
   db.persist();
   addAudit({ actorId: req.user._id, actorEmail: req.user.email, actorRole: req.user.role, action: `PACKAGE_ACTION_${action.toUpperCase()}`, entity: "package", entityId: pkg._id, reason: note, changes: { status: target } });
-  return res.json({ message: target ? `Package moved to ${target}.` : "Request sent to the warehouse team.", package: { ...pkg, allowedActions: allowedActionsFor(pkg), storage: storageInfo(pkg) } });
+  return res.json({ message: target ? `Package moved to ${target}.` : "Request sent to the warehouse team.", package: { ...publicPkg(pkg), allowedActions: allowedActionsFor(pkg), storage: storageInfo(pkg) } });
 }));
 
 /** GET /api/account/overview-stats — real counts for the member Overview. */
@@ -261,7 +270,7 @@ router.get("/admin/packages", requireAuth, requireRole(ADMIN_ROLES), ah(async (r
         (p.merchant || "").toLowerCase().includes(q),
     );
   }
-  return res.json({ packages: rows.map((p) => ({ ...p, allowedTransitions: transitionsOf(p) })) });
+  return res.json({ packages: rows.map((p) => ({ ...publicPkg(p), allowedTransitions: transitionsOf(p) })) });
 }));
 
 /**
@@ -290,7 +299,7 @@ router.post("/admin/packages/receive", requireAuth, requireRole(ADMIN_ROLES), ah
     // tracking number is a no-op returning the existing package — never a twin.
     const existing = pre ? null : (db.data.packages || []).find((p) => p.merchantTrackingNumber === merchantTracking && p._id !== pre?._id);
     if (existing) {
-      return res.json({ message: `Already received on ${(existing.receivedAt || "").slice(0, 10)} — returning existing package.`, package: { ...existing, allowedActions: allowedActionsFor(existing) } });
+      return res.json({ message: `Already received on ${(existing.receivedAt || "").slice(0, 10)} — returning existing package.`, package: { ...publicPkg(existing), allowedActions: allowedActionsFor(existing) } });
     }
 
     const weight = Number(b.weight);
@@ -366,7 +375,7 @@ router.post("/admin/packages/receive", requireAuth, requireRole(ADMIN_ROLES), ah
           <p>Sign in to your dashboard to review it and choose what to do next.</p></div>`,
       }).catch(() => {});
     }
-    return res.status(201).json({ message: "Package received" + (customerEmail ? " and assigned" : " — unassigned (assign a mailbox)"), package: { ...pkg, allowedActions: allowedActionsFor(pkg), allowedTransitions: transitionsOf(pkg) } });
+    return res.status(201).json({ message: "Package received" + (customerEmail ? " and assigned" : " — unassigned (assign a mailbox)"), package: { ...publicPkg(pkg), allowedActions: allowedActionsFor(pkg), allowedTransitions: transitionsOf(pkg) } });
   };
   if (idem) return withIdempotency("receive:" + idem, 60000, run);
   return run();
@@ -389,7 +398,7 @@ router.post("/admin/packages/:id/assign", requireAuth, requireRole(ADMIN_ROLES),
   pkg.updatedAt = new Date().toISOString();
   db.persist();
   addAudit({ actorId: req.user._id, actorEmail: req.user.email, actorRole: req.user.role, action: "PACKAGE_ASSIGNED", entity: "package", entityId: pkg._id, changes: { before: before || null, after: member.email } });
-  return res.json({ message: `Package assigned to ${member.email}.`, package: { ...pkg, allowedTransitions: transitionsOf(pkg) } });
+  return res.json({ message: `Package assigned to ${member.email}.`, package: { ...publicPkg(pkg), allowedTransitions: transitionsOf(pkg) } });
 }));
 
 /** PATCH /admin/packages/:id/measurements — correct weight/dimensions (audited). */
@@ -412,7 +421,7 @@ router.patch("/admin/packages/:id/measurements", requireAuth, requireRole(ADMIN_
   pkg.updatedAt = new Date().toISOString();
   db.persist();
   addAudit({ actorId: req.user._id, actorEmail: req.user.email, actorRole: req.user.role, action: "PACKAGE_MEASUREMENTS_CORRECTED", entity: "package", entityId: pkg._id, reason, changes });
-  return res.json({ message: "Measurements corrected (audited).", package: { ...pkg, allowedTransitions: transitionsOf(pkg) } });
+  return res.json({ message: "Measurements corrected (audited).", package: { ...publicPkg(pkg), allowedTransitions: transitionsOf(pkg) } });
 }));
 
 /** POST /admin/packages/:id/status — staff status transition (state machine). */
@@ -429,7 +438,7 @@ router.post("/admin/packages/:id/status", requireAuth, requireRole(ADMIN_ROLES),
   pkg.updatedAt = new Date().toISOString();
   db.persist();
   addAudit({ actorId: req.user._id, actorEmail: req.user.email, actorRole: req.user.role, action: "PACKAGE_STATUS_CHANGE", entity: "package", entityId: pkg._id, reason, changes: { before, after: to } });
-  return res.json({ message: `Status → ${to}`, package: { ...pkg, allowedTransitions: transitionsOf(pkg) } });
+  return res.json({ message: `Status → ${to}`, package: { ...publicPkg(pkg), allowedTransitions: transitionsOf(pkg) } });
 }));
 
 /* -------------------------------- photo upload -------------------------------- */
@@ -457,16 +466,32 @@ router.post("/admin/packages/:id/photos", requireAuth, requireRole(ADMIN_ROLES),
   if (!req.files || req.files.length === 0) return res.status(400).json({ message: "No photos uploaded." });
   const view = String(req.body.view || "front");
   pkg.photos = pkg.photos || [];
+  let inBucket = 0;
   for (const f of req.files) {
-    pkg.photos.push({ id: f.filename, view, name: f.originalname, size: f.size, uploadedAt: new Date().toISOString() });
+    const photo = { id: f.filename, view, name: f.originalname, size: f.size, uploadedAt: new Date().toISOString(), source: "local" };
+    // Bucket upload happens server-side; local copy is deleted only after the
+    // bucket confirms, otherwise the photo stays on disk (no silent loss).
+    if (bucketConfigured()) {
+      try {
+        const up = await uploadToBucket({ filePath: path.join(UPLOAD_DIR, f.filename), name: f.originalname, mime: f.mimetype });
+        photo.utKey = up.key;
+        photo.utUrl = up.url;
+        photo.source = "bucket";
+        fs.unlinkSync(path.join(UPLOAD_DIR, f.filename));
+        inBucket += 1;
+      } catch (err) {
+        console.error("[bucket] upload failed (photo kept on local disk):", err?.message ?? err);
+      }
+    }
+    pkg.photos.push(photo);
   }
   pkg.updatedAt = new Date().toISOString();
   db.persist();
-  addAudit({ actorId: req.user._id, actorEmail: req.user.email, actorRole: req.user.role, action: "PACKAGE_PHOTOS_ADDED", entity: "package", entityId: pkg._id, changes: { count: req.files.length } });
-  return res.json({ message: `${req.files.length} photo(s) saved.`, photos: pkg.photos });
+  addAudit({ actorId: req.user._id, actorEmail: req.user.email, actorRole: req.user.role, action: "PACKAGE_PHOTOS_ADDED", entity: "package", entityId: pkg._id, changes: { count: req.files.length, inBucket } });
+  return res.json({ message: `${req.files.length} photo(s) saved${bucketConfigured() ? ` (${inBucket} in bucket)` : ""}.`, photos: pkg.photos });
 }));
 
-/** GET /files/packages/:filename — access-controlled photo stream. */
+/** GET /files/packages/:filename — access-controlled photo stream (bucket or disk). */
 router.get("/files/packages/:filename", requireAuth, ah(async (req, res) => {
   const filename = String(req.params.filename || "");
   if (!/^[a-f0-9-]{36}\.(jpg|jpeg|png|webp|gif)$/i.test(filename)) {
@@ -474,9 +499,24 @@ router.get("/files/packages/:filename", requireAuth, ah(async (req, res) => {
   }
   const owner = (db.data.packages || []).find((p) => (p.photos || []).some((ph) => ph.id === filename));
   if (!owner) return res.status(404).json({ message: "File not found." });
+  const photo = (owner.photos || []).find((ph) => ph.id === filename);
   const isAdmin = ADMIN_ROLES.some((r) => r.toUpperCase() === (req.user.role || "").toUpperCase());
   if (!isAdmin && owner.customerEmail !== req.user.email) {
     return res.status(403).json({ message: "You do not have access to this file." });
+  }
+  // Bucket-backed: stream the object server-side so the client never sees the
+  // raw bucket URL and every read still passes this authorization gate.
+  if (photo?.source === "bucket" && photo.utUrl) {
+    try {
+      const up = await fetch(photo.utUrl);
+      if (!up.ok) return res.status(404).json({ message: "File not found in bucket." });
+      const buf = Buffer.from(await up.arrayBuffer());
+      res.setHeader("Content-Type", up.headers.get("content-type") || "application/octet-stream");
+      return res.send(buf);
+    } catch (err) {
+      console.error("[bucket] read failed:", err?.message ?? err);
+      return res.status(502).json({ message: "File storage temporarily unavailable." });
+    }
   }
   const filePath = path.join(UPLOAD_DIR, filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found." });

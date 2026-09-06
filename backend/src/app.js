@@ -11,6 +11,8 @@ import shopRoutes from "./routes/shop.routes.js";
 import membershipRoutes from "./routes/membership.routes.js";
 import notificationRoutes from "./routes/notifications.routes.js";
 import commerceRoutes from "./routes/commerce.routes.js";
+import moneyRoutes from "./routes/money.routes.js";
+import referralRoutes from "./routes/referral.routes.js";
 
 const app = express();
 const LANDING = fs.readFileSync(new URL("./landing.html", import.meta.url), "utf8");
@@ -69,6 +71,8 @@ app.use("/api/shop", shopRoutes);
 app.use("/api", membershipRoutes);
 app.use("/api", notificationRoutes);
 app.use("/api", commerceRoutes);
+app.use("/api", moneyRoutes);
+app.use("/api", referralRoutes);
 
 // Unknown routes -> always JSON. (Express's built-in HTML error page sets
 // Content-Security-Policy: default-src 'none', which breaks Chrome DevTools

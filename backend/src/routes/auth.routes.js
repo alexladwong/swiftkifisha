@@ -7,6 +7,7 @@ import { db, objectId } from "../lib/db.js";
 import { ah, requireAuth } from "../middleware/auth.js";
 import { isEmail } from "../lib/util.js";
 import { HUB_COUNTRIES, HUB_MAILBOX_EXAMPLES } from "../lib/intl.js";
+import { freshReferralCode } from "./referral.routes.js";
 import { sendPasswordResetEmail, sendOtpEmail, sendMembershipEmail } from "../lib/mailer.js";
 import { createApplication, applicationByEmail } from "../lib/applications.js";
 import {
@@ -128,7 +129,7 @@ router.post("/add-user", requireAuth, ah(async (req, res) => {
 
 /** POST /api/auth/signup  { name, email, password } -> member account + mailboxes */
 router.post("/signup", ah(async (req, res) => {
-  const { name, email, password } = req.body || {};
+  const { name, email, password, refCode } = req.body || {};
   if (!name || !String(name).trim()) return res.status(400).json({ message: "Name is required." });
   if (!isEmail(email)) return res.status(400).json({ message: "A valid email address is required." });
   if (!password || String(password).length < 6) return res.status(400).json({ message: "Password must be at least 6 characters." });
@@ -136,12 +137,19 @@ router.post("/signup", ah(async (req, res) => {
   if (db.data.users.some((u) => u.email === normalized)) {
     return res.status(409).json({ message: "An account with this email already exists." });
   }
+  // Referral: the new account carries its own invite code; when a valid
+  // refCode was supplied it is stored (the referrer earns points after this
+  // member's application is accepted).
+  const wantedRef = String(refCode || "").trim().toUpperCase();
+  const referrerExists = wantedRef ? db.data.users.some((u) => String(u.referralCode || "").toUpperCase() === wantedRef) : false;
   const user = {
     _id: objectId(),
     name: String(name).trim(),
     email: normalized,
     passwordHash: await bcrypt.hash(String(password), config.bcryptRounds ?? 10),
     role: "member",
+    referralCode: freshReferralCode(),
+    referredBy: referrerExists ? wantedRef : undefined,
     createdAt: new Date().toISOString(),
   };
   db.data.users.push(user);
@@ -421,7 +429,7 @@ router.get("/sign-in/social", ah(async (req, res) => {
   if (!/^https?:\/\//.test(callbackURL)) {
     return res.status(400).json({ message: "A valid callback URL is required." });
   }
-  const redirectURI = googleRedirectURI();
+  const redirectURI = googleRedirectURI(req);
   const state = googleStateToken(callbackURL);
   return res.redirect(googleAuthURL({ clientId: g.clientId, redirectURI, state }));
 }));
@@ -446,7 +454,7 @@ router.get("/callback/google", ah(async (req, res) => {
     return res.status(400).json({ message: "Invalid sign-in state. Please try again." });
   }
   const g = googleConfig();
-  const redirectURI = googleRedirectURI();
+  const redirectURI = googleRedirectURI(req);
 
   let profile;
   try {

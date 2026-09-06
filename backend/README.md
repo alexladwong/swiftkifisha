@@ -98,6 +98,47 @@ Commercial notes:
   pricingRules, carriers, auditLogs, quotes). Neon sync is merge-based
   (`push` upserts; use `removeDocs()` for explicit deletions).
 
+### Commercial money (Phase 2 — routes in `src/routes/money.routes.js`)
+
+Invoices (`SKI-…`), payments (`SKP-…`, server-verified only), wallet/ledger
+(account credit), and dispatch shipments (`SKS-…`). Pricing is always computed
+on the backend from `pricingRules`. No member endpoint can mark a payment paid;
+finance verification (reason + reference) or a wallet ledger debit is the only
+path to PAID, and a Shipment is created only after the invoice is fully paid.
+Provider channels (MTN MoMo, Airtel Money, card) are registry rows —
+*Integration prepared — provider credentials required*.
+
+| Method | Path | Auth | Description |
+| ------ | ---- | ---- | ----------- |
+| GET    | /api/billing/overview | 🔒 | Wallet balance, open balance, recent invoices/payments |
+| POST   | /api/checkout | 🔒 | packageIds + destinationAddress (+insurance, declaredValue) → Invoice + PENDING payment |
+| GET    | /api/invoices, /api/invoices/:id | 🔒 | Member invoices (+detail w/ payments/shipment/packages) |
+| POST   | /api/invoices/:id/cancel | 🔒 | Void an unpaid invoice (packages freed) |
+| GET    | /api/payments | 🔒 | Member payments |
+| POST   | /api/payments/:id/cancel | 🔒 | Cancel own PENDING payment |
+| GET    | /api/wallet | 🔒 | Balance + ledger entries (CREDIT/DEBIT) |
+| POST   | /api/wallet/pay-invoice | 🔒 | Spend wallet credit on an invoice (ledger-debited) |
+| GET    | /api/admin/payments | 🔒‡ | Payment queue + history |
+| POST   | /api/admin/payments/:id/verify | 🔒‡ | reason + reference → PAID (idempotent, audited, may create shipment) |
+| POST   | /api/admin/payments/:id/reject | 🔒‡ | reason → FAILED |
+| GET    | /api/admin/invoices, /api/admin/invoices/:id | 🔒‡ | Finance invoice views |
+| POST   | /api/admin/wallet/credit | 🔒‡ | Add account credit (immutable ledger row + audit) |
+| GET/PUT| /api/admin/payment-config | 🔒‡ | Real payment instructions (offline/bank) |
+| GET    | /api/admin/shipments, /:id | 🔒* | Dispatch queue + detail (allowedTransitions included) |
+| POST   | /api/admin/shipments/:id/events | 🔒* | Real staff tracking event (machine-validated, audited) |
+| GET/POST/PATCH/DELETE | /api/admin/pricing-rules | 🔒*/🔒‡ | Backend pricing rule CRUD (audited) |
+
+🔒 member · 🔒* staff roles · 🔒‡ finance/admin (SUPER_ADMIN, ADMIN, FINANCE).
+
+### File storage (UploadThing bucket)
+
+Package photos upload server-side to the UploadThing bucket
+(`backend/src/lib/fileBucket.js`; token in `backend/.env` only). `GET
+/files/packages/:filename` authorizes (owner/admin) then streams the object —
+clients never receive the raw bucket URL. When the bucket is unconfigured,
+uploads fall back to local disk automatically.
+
+
 ## International (Kifisha) model
 
 SwiftKifisha Uganda mirrors the Kifisha model: members hold personal mailbox

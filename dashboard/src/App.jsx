@@ -24,6 +24,10 @@ import AnnouncementsPage from "@/pages/Announcements";
 import Warehouses from "@/pages/Warehouses";
 import Receiving from "@/pages/Receiving";
 import WarehousePackages from "@/pages/WarehousePackages";
+import Payments from "@/pages/Payments";
+import Invoices from "@/pages/Invoices";
+import Shipments from "@/pages/Shipments";
+import Pricing from "@/pages/Pricing";
 
 const App = () => (
   <TooltipProvider>
@@ -43,6 +47,10 @@ const App = () => (
             <Route path="/warehouses" element={<Warehouses />} />
             <Route path="/receiving" element={<Receiving />} />
             <Route path="/packages" element={<WarehousePackages />} />
+            <Route path="/payments" element={<Payments />} />
+            <Route path="/invoices" element={<Invoices />} />
+            <Route path="/shipments" element={<Shipments />} />
+            <Route path="/pricing" element={<Pricing />} />
             <Route path="/parcel/:id" element={<ParcelDetails />} />
             <Route path="/tracking" element={<ParcelTracking />} />
             <Route path="/analytics" element={<Analytics />} />

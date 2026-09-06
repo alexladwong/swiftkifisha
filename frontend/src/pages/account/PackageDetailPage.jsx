@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  ArrowLeft, RefreshCw, Loader2, Camera, Store, Ruler, TriangleAlert, CalendarDays, ChevronRight,
+  ArrowLeft, ArrowRight, RefreshCw, Loader2, Camera, Store, Ruler, TriangleAlert, CalendarDays, ChevronRight,
   Ship, Combine, Boxes, CirclePause, Undo2, Trash2, PackageSearch, PackageX, ImageOff, Info, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -662,18 +662,35 @@ export default function PackageDetailPage() {
 
             {(!pkg.allowedActions || pkg.allowedActions.length === 0) && pkg.status === "READY_FOR_PAYMENT" && (
               <div className="mt-4 rounded-xl border border-amber-200/80 bg-amber-50/70 p-4">
-                <p className="text-sm font-bold text-amber-900">Ready for the next step</p>
+                <p className="text-sm font-bold text-amber-900">Ready to ship — payment required</p>
                 <p className="mt-1 text-[13px] leading-relaxed text-amber-800/90">
-                  Shipping payment and checkout arrive in the next release. Meanwhile, get an estimate of what
-                  shipping this parcel will cost.
+                  This parcel is packed and ready. Pay for shipping and we'll dispatch it to your door.
                 </p>
-                <Button
-                  type="button"
-                  onClick={openQuote}
-                  className="mt-3 h-10 rounded-lg bg-accent px-4 text-sm font-bold text-white hover:bg-accent/90"
-                >
-                  Get a shipping quote
-                </Button>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Link
+                    to={"/account/checkout?package=" + encodeURIComponent(pkg.packageId)}
+                    className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-accent px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-accent/90"
+                  >
+                    Pay & ship <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={openQuote}
+                    className="h-10 rounded-lg border-[#e5eaf2] bg-white px-4 text-sm font-bold text-slate-700 hover:border-primary/30 hover:text-primary"
+                  >
+                    Get a shipping quote
+                  </Button>
+                </div>
+                {pkg.lastCustomerAction?.action === "ship" && (
+                  <p className="mt-3 flex items-start gap-1.5 text-[12.5px] font-semibold leading-relaxed text-amber-800/90">
+                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      You already asked us to ship this parcel — your invoice is waiting under{" "}
+                      <Link to="/account/billing" className="font-bold text-primary hover:underline">Billing</Link>.
+                    </span>
+                  </p>
+                )}
               </div>
             )}
 

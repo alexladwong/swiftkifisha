@@ -22,6 +22,7 @@ import {
   createApplication, updateApplication,
 } from "../lib/applications.js";
 import { sendMembershipEmail } from "../lib/mailer.js";
+import { awardReferral } from "./referral.routes.js";
 
 const router = Router();
 
@@ -146,6 +147,13 @@ router.post("/membership/applications/:id/action", requireAuth, ah(async (req, r
     updateApplication(app._id, { status: "accepted", note, reviewedBy: req.user.email });
     sendMembershipEmail({ to: app.email, kind: "status", status: "accepted", applicant: app, note }).catch((e) =>
       console.error(`[mail] acceptance email to ${app.email} failed:`, e?.message ?? e));
+    // Referral reward: if this member signed up with a referral code, the
+    // referrer earns points now (idempotent per referred user).
+    try {
+      awardReferral({ referredUser: user, actorId: req.user._id, actorEmail: req.user.email, actorRole: req.user.role });
+    } catch (err) {
+      console.error("[referral] award failed:", err?.message ?? err);
+    }
     return res.json({ message: "Membership approved — mailboxes provisioned and applicant emailed.", status: "accepted" });
   }
 

@@ -54,6 +54,7 @@ export const SYNC_COLLECTIONS = [
   "users", "members", "parcels", "resetTokens",
   "applications", "messages", "announcements",
   "warehouses", "packages", "pricingRules", "carriers", "auditLogs", "quotes",
+  "invoices", "payments", "ledger", "shipments", "settings", "points",
 ];
 
 export async function pull(p = null) {

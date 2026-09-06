@@ -27,13 +27,29 @@ export function googleConfig() {
 
 /**
  * The backend OWNS the OAuth callback: the redirect URI is always
- * PUBLIC_API_URL + /api/auth/callback/google — never derived from the
- * browser's window.location. Local default http://localhost:5001; set
- * PUBLIC_API_URL=https://api.eazyjobs.info on the production host.
+ * <api origin> + /api/auth/callback/google — never derived from the
+ * browser's window.location.
+ *
+ * Origin resolution order:
+ *   1. PUBLIC_API_URL (explicit; set on the production host, e.g.
+ *      https://api.eazyjobs.info)
+ *   2. The request's X-Forwarded-Host / X-Forwarded-Proto (reverse proxies:
+ *      Caddy, nginx) — this keeps Google sign-in working on hosts whose env
+ *      does not (yet) set PUBLIC_API_URL.
+ *   3. The plain Host header (direct access, e.g. localhost dev).
+ *
+ * Google only honors redirect URIs registered in the OAuth console, so a
+ * host-derived URI cannot be abused for redirect attacks.
  */
-export function googleRedirectURI() {
-  const base = (process.env.PUBLIC_API_URL || "http://localhost:5001").replace(/\/+$/, "");
-  return base + "/api/auth/callback/google";
+export function googleRedirectURI(req) {
+  let base = (process.env.PUBLIC_API_URL || "").replace(/\/+$/, "");
+  if (!base && req) {
+    const proto = String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim().toLowerCase() || (req.socket?.encrypted ? "https" : "http");
+    const host = String(req.headers["x-forwarded-host"] || "").split(",")[0].trim().toLowerCase() || String(req.headers.host || "").toLowerCase();
+    if (/^[a-z0-9.-]+(:\d+)?$/.test(host)) base = `${proto}://${host}`;
+  }
+  if (!base) base = "http://localhost:5001";
+  return base.replace(/\/+$/, "") + "/api/auth/callback/google";
 }
 
 /** Stateless signed state carrying the frontend callback URL (10 min). */

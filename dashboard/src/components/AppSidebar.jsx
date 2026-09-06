@@ -15,6 +15,10 @@ import {
   Warehouse,
   PackageCheck,
   PackageSearch,
+  CreditCard,
+  FileText,
+  Truck,
+  Tags,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
@@ -50,6 +54,12 @@ const mainItems = [
   { title: "Announcements", url: "/announcements", icon: Megaphone },
   { title: "Profile", url: "/profile", icon: UserRound },
   { title: "Security", url: "/security", icon: ShieldCheck },
+];
+const financeItems = [
+  { title: "Payments", url: "/payments", icon: CreditCard },
+  { title: "Invoices", url: "/invoices", icon: FileText },
+  { title: "Shipments", url: "/shipments", icon: Truck },
+  { title: "Pricing", url: "/pricing", icon: Tags },
 ];
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -118,6 +128,32 @@ export function AppSidebar() {
                             {unread}
                           </span>
                         )}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sidebar-foreground/50">
+            Finance
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {financeItems.map((item) => {
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        className="hover:bg-sidebar-accent"
+                        to={item.url}
+                        activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      >
+                        <item.icon className="h-4 w-4" />{" "}
+                        {!collapsed && <span>{item.title}</span>}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

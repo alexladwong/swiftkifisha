@@ -13,7 +13,7 @@ import { ensureEnabled, push } from "./remoteStore.js";
 class JsonDb {
   constructor(file) {
     this.file = file;
-    this.data = { users: [], members: [], parcels: [], resetTokens: [], applications: [], messages: [], announcements: [], warehouses: [], packages: [], pricingRules: [], carriers: [], auditLogs: [], quotes: [], warehouses: [], packages: [], pricingRules: [], carriers: [], auditLogs: [], quotes: [] };
+    this.data = { users: [], members: [], parcels: [], resetTokens: [], applications: [], messages: [], announcements: [], warehouses: [], packages: [], pricingRules: [], carriers: [], auditLogs: [], quotes: [], invoices: [], payments: [], ledger: [], shipments: [], settings: [] , points: []};
     this.load();
   }
 
@@ -35,10 +35,16 @@ class JsonDb {
         applications: Array.isArray(parsed?.applications) ? parsed.applications : [],
         messages: Array.isArray(parsed?.messages) ? parsed.messages : [],
         announcements: Array.isArray(parsed?.announcements) ? parsed.announcements : [],
+        invoices: Array.isArray(parsed?.invoices) ? parsed.invoices : [],
+        payments: Array.isArray(parsed?.payments) ? parsed.payments : [],
+        ledger: Array.isArray(parsed?.ledger) ? parsed.ledger : [],
+        shipments: Array.isArray(parsed?.shipments) ? parsed.shipments : [],
+        settings: Array.isArray(parsed?.settings) ? parsed.settings : [],
+        points: Array.isArray(parsed?.points) ? parsed.points : [],
       };
     } catch (err) {
       console.error("[db] Corrupt database file, starting empty:", err.message);
-      this.data = { users: [], members: [], parcels: [], resetTokens: [], applications: [], messages: [], announcements: [], warehouses: [], packages: [], pricingRules: [], carriers: [], auditLogs: [], quotes: [], warehouses: [], packages: [], pricingRules: [], carriers: [], auditLogs: [], quotes: [] };
+      this.data = { users: [], members: [], parcels: [], resetTokens: [], applications: [], messages: [], announcements: [], warehouses: [], packages: [], pricingRules: [], carriers: [], auditLogs: [], quotes: [], invoices: [], payments: [], ledger: [], shipments: [], settings: [] };
     }
   }
 

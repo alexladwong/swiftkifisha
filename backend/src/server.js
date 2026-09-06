@@ -18,6 +18,9 @@ async function syncFromRemote() {
         warehouses: remote.warehouses || [], packages: remote.packages || [],
         pricingRules: remote.pricingRules || [], carriers: remote.carriers || [],
         auditLogs: remote.auditLogs || [], quotes: remote.quotes || [],
+        invoices: remote.invoices || [], payments: remote.payments || [],
+        ledger: remote.ledger || [], shipments: remote.shipments || [],
+        settings: remote.settings || [], points: remote.points || [],
       };
       console.log("[remote] loaded " + remote.users.length + " users, " + remote.members.length + " members, " + remote.parcels.length + " parcels from Neon");
     } else if (!db.isEmpty()) {

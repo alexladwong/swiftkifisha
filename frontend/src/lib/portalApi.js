@@ -88,3 +88,82 @@ export const fetchPhotoUrl = async (filename) => {
   });
   return URL.createObjectURL(res.data);
 };
+
+/* ------------------------- billing, invoices, payments & wallet ------------------------- */
+
+export const fetchBillingOverview = async () => {
+  const { data } = await axiosInstance.get("/billing/overview", { headers: auth() });
+  return data; // { wallet, openInvoiceCount, openBalance, unpaidPayments, recentInvoices, recentPayments }
+};
+
+export const fetchMyInvoices = async () => {
+  const { data } = await axiosInstance.get("/invoices", { headers: auth() });
+  return data.invoices || [];
+};
+
+export const fetchInvoice = async (idOrInvoiceId) => {
+  const { data } = await axiosInstance.get("/invoices/" + encodeURIComponent(idOrInvoiceId), {
+    headers: auth(),
+  });
+  return data; // { invoice, payments, shipment, packages }
+};
+
+export const cancelInvoice = async (idOrInvoiceId, reason) => {
+  const { data } = await axiosInstance.post(
+    "/invoices/" + encodeURIComponent(idOrInvoiceId) + "/cancel",
+    { reason: reason || undefined },
+    { headers: auth() },
+  );
+  return data; // { message, invoice } — the API may answer 409 with { message }
+};
+
+export const fetchMyPayments = async () => {
+  const { data } = await axiosInstance.get("/payments", { headers: auth() });
+  return data.payments || [];
+};
+
+export const cancelPayment = async (idOrPaymentId) => {
+  const { data } = await axiosInstance.post(
+    "/payments/" + encodeURIComponent(idOrPaymentId) + "/cancel",
+    {},
+    { headers: auth() },
+  );
+  return data; // { message, payment } — pending only
+};
+
+export const fetchWallet = async () => {
+  const { data } = await axiosInstance.get("/wallet", { headers: auth() });
+  return data; // { balance, currency, entries, walletCurrency, balances, minTopup, rateUsdUgx }
+};
+
+export const payInvoiceFromWallet = async (invoiceId) => {
+  const { data } = await axiosInstance.post("/wallet/pay-invoice", { invoiceId }, { headers: auth() });
+  return data; // { message, payment, invoice, shipment? }
+};
+
+export const topUpWallet = async (payload) => {
+  const { data } = await axiosInstance.post("/wallet/topup", payload, { headers: auth() });
+  return data; // 201 { message, payment, paymentInstructions, channels, walletCurrency, minTopup }
+};
+
+export const createCheckout = async (payload) => {
+  const { data } = await axiosInstance.post("/checkout", payload, { headers: auth() });
+  return data; // 201 { message, invoice, payment, paymentInstructions, channels }
+};
+
+/* ------------------------- referrals & points ------------------------- */
+
+export const fetchReferralInfo = async () => {
+  const { data } = await axiosInstance.get("/referrals", { headers: auth() });
+  return data; // { code, link, stats: { invitedSignups, accepted, balance } }
+};
+
+export const fetchReferralPoints = async () => {
+  const { data } = await axiosInstance.get("/referrals/points", { headers: auth() });
+  return data; // { balance, entries: [{ type, points, reason, createdAt }] }
+};
+
+export const redeemReferralPoints = async (points) => {
+  const { data } = await axiosInstance.post("/referrals/redeem", { points }, { headers: auth() });
+  return data; // { message, pointsDebited, usdCredited, balance, walletBalance }
+};

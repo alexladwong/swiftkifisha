@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useDispatch, useSelector } from "react-redux";
 import { ArrowLeft, MailCheck } from "lucide-react";
@@ -19,6 +19,7 @@ export default function AuthDialog({ open, onOpenChange, initialMode = "signin" 
   const { loading } = useSelector((state) => state.auth);
   const [mode, setMode] = useState(initialMode);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [refCode, setRefCode] = useState("");
   const [forgotBusy, setForgotBusy] = useState(false);
   const [forgotState, setForgotState] = useState(null); // { message?, devResetLink?, error? }
 
@@ -28,13 +29,34 @@ export default function AuthDialog({ open, onOpenChange, initialMode = "signin" 
     setForgotState(null);
   };
 
+  // Optional referral prefill — read ?ref= once per signup session (also covers
+  // /become-member?ref=… because client-side navigation keeps window.location.search
+  // current). A code the member typed themselves is never overwritten.
+  useEffect(() => {
+    if (open && mode === "signup") {
+      setRefCode((cur) => {
+        if (cur) return cur;
+        const ref = new URLSearchParams(window.location.search).get("ref");
+        return ref ? ref.trim() : "";
+      });
+    }
+  }, [open, mode]);
+
   const submit = async (e) => {
     e.preventDefault();
     if (mode === "signin") {
       const res = await dispatch(loginThunk({ email: form.email, password: form.password }));
       if (loginThunk.fulfilled.match(res)) onOpenChange(false);
     } else {
-      const res = await dispatch(signupThunk({ name: form.name, email: form.email, password: form.password }));
+      const ref = refCode.trim();
+      const res = await dispatch(
+        signupThunk({
+          name: form.name,
+          email: form.email,
+          password: form.password,
+          ...(ref ? { refCode: ref } : {}),
+        }),
+      );
       if (signupThunk.fulfilled.match(res)) onOpenChange(false);
     }
   };
@@ -133,6 +155,18 @@ export default function AuthDialog({ open, onOpenChange, initialMode = "signin" 
               <div className="space-y-2">
                 <Label>{t("auth.labelPassword")}</Label>
                 <Input type="password" placeholder={t("auth.placeholderPassword")} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={6} />
+              </div>
+            )}
+            {mode === "signup" && (
+              <div className="space-y-2">
+                <Label>Referral code (optional)</Label>
+                <Input
+                  placeholder="e.g. SK-XXXXXX — from a friend who referred you"
+                  value={refCode}
+                  onChange={(e) => setRefCode(e.target.value)}
+                  maxLength={40}
+                  autoComplete="off"
+                />
               </div>
             )}
 
