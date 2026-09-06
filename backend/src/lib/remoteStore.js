@@ -50,12 +50,17 @@ export async function ensureSchema(p = null) {
 }
 
 /** Load the full dataset from Postgres (null when nothing stored yet). */
+export const SYNC_COLLECTIONS = [
+  "users", "members", "parcels", "resetTokens",
+  "applications", "messages", "announcements",
+];
+
 export async function pull(p = null) {
   const client = p || (await connectPool());
   if (!client) return null;
   const res = await client.query("SELECT collection, doc FROM SwiftKifisha_sync");
   if (res.rows.length === 0) return null;
-  const out = { users: [], members: [], parcels: [] };
+  const out = Object.fromEntries(SYNC_COLLECTIONS.map((c) => [c, []]));
   for (const row of res.rows) {
     if (Array.isArray(out[row.collection])) out[row.collection].push(row.doc);
   }
@@ -75,7 +80,7 @@ export async function push(data, p = null) {
     await tx.query("DELETE FROM SwiftKifisha_sync");
     const params = [];
     const rows = [];
-    for (const collection of ["users", "members", "parcels"]) {
+    for (const collection of SYNC_COLLECTIONS) {
       for (const doc of data[collection] || []) {
         params.push(collection, String(doc._id), JSON.stringify(doc));
         rows.push("($" + (params.length - 2) + "::text, $" + (params.length - 1) + "::text, $" + params.length + "::jsonb)");

@@ -11,6 +11,7 @@ import AccountOverview from "./pages/account/Overview";
 import AccountProfile from "./pages/account/ProfileSection";
 import AccountAddresses from "./pages/account/AddressesSection";
 import AccountSecurity from "./pages/account/SecuritySection";
+import AccountNotifications from "./pages/account/NotificationsSection";
 import TrackParcel from "./pages/TrackParcel";
 import CalculateCost from "./pages/CalculateCost";
 import About from "./pages/About";
@@ -42,6 +43,7 @@ const App = () => (
           <Route path="profile" element={<AccountProfile />} />
           <Route path="addresses" element={<AccountAddresses />} />
           <Route path="security" element={<AccountSecurity />} />
+          <Route path="notifications" element={<AccountNotifications />} />
         </Route>
         <Route path="/track" element={<TrackParcel />} />
         <Route path="/calculate" element={<CalculateCost />} />

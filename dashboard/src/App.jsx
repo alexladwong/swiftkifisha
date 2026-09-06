@@ -19,6 +19,8 @@ import Members from "@/pages/Members";
 import SecurityPage from "@/pages/Security";
 import ProfilePage from "@/pages/Profile";
 import MembershipApplicationsPage from "@/pages/MembershipApplications";
+import MessagesPage from "@/pages/Messages";
+import AnnouncementsPage from "@/pages/Announcements";
 
 const App = () => (
   <TooltipProvider>
@@ -43,6 +45,8 @@ const App = () => (
             <Route path="/security" element={<SecurityPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/membership-applications" element={<MembershipApplicationsPage />} />
+            <Route path="/messages" element={<MessagesPage />} />
+            <Route path="/announcements" element={<AnnouncementsPage />} />
           </Route>
         </Route>
 

@@ -289,6 +289,22 @@ export async function sendMembershipEmail({ to, kind, applicant, status, note, r
   return sent;
 }
 
+/** Generic SMTP/API send (used by contact, replies and announcements). */
+export async function sendGenericEmail({ to, subject, html }) {
+  const sender = fromParts();
+  const smtpHost = process.env.EMAIL_HOST;
+  const smtpUser = process.env.EMAIL_HOST_USER;
+  const smtpPass = process.env.EMAIL_HOST_PASSWORD;
+  if (smtpHost && smtpUser && smtpPass) {
+    await smtpSend({ host: smtpHost, port: process.env.EMAIL_PORT, user: smtpUser, password: smtpPass, from: sender, to, subject, html });
+    console.log(`[mail] queued "${subject}" to ${to} via ${smtpHost}:${process.env.EMAIL_PORT || 465}`);
+    return true;
+  }
+  const sent = await sendViaBrevo({ to, subject, html });
+  if (!sent) console.log(`[mail] no provider — "${subject}" to ${to} not sent`);
+  return sent;
+}
+
 export async function sendPasswordResetEmail({ to, resetLink }) {
   const html = resetHtml(resetLink);
   const subject = "Reset your SwiftKifisha password";

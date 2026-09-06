@@ -13,7 +13,7 @@ import { ensureEnabled, push } from "./remoteStore.js";
 class JsonDb {
   constructor(file) {
     this.file = file;
-    this.data = { users: [], members: [], parcels: [], resetTokens: [] };
+    this.data = { users: [], members: [], parcels: [], resetTokens: [], applications: [], messages: [], announcements: [] };
     this.load();
   }
 
@@ -26,10 +26,13 @@ class JsonDb {
         members: Array.isArray(parsed?.members) ? parsed.members : [],
         parcels: Array.isArray(parsed?.parcels) ? parsed.parcels : [],
         resetTokens: Array.isArray(parsed?.resetTokens) ? parsed.resetTokens : [],
+        applications: Array.isArray(parsed?.applications) ? parsed.applications : [],
+        messages: Array.isArray(parsed?.messages) ? parsed.messages : [],
+        announcements: Array.isArray(parsed?.announcements) ? parsed.announcements : [],
       };
     } catch (err) {
       console.error("[db] Corrupt database file, starting empty:", err.message);
-      this.data = { users: [], members: [], parcels: [], resetTokens: [] };
+      this.data = { users: [], members: [], parcels: [], resetTokens: [], applications: [], messages: [], announcements: [] };
     }
   }
 

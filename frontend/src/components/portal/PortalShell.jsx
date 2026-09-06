@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useNavigate, useLocation } from "react-router-do
 import { useDispatch, useSelector } from "react-redux";
 import {
   LayoutDashboard, UserRound, MapPin, ShieldCheck, Package, LogOut, Menu,
-  HelpCircle, ArrowUpRight, Clock3, Loader2,
+  HelpCircle, ArrowUpRight, Clock3, Loader2, Bell,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import SideDrawer from "@/components/layout/SideDrawer";
@@ -13,6 +13,7 @@ import { logout } from "@/features/auth/authSlice";
 
 const NAV = [
   { to: "/account", end: true, icon: LayoutDashboard, label: "Overview" },
+  { to: "/account/notifications", icon: Bell, label: "Notifications" },
   { to: "/account/profile", icon: UserRound, label: "My Profile" },
   { to: "/account/addresses", icon: MapPin, label: "My Addresses" },
   { to: "/account/security", icon: ShieldCheck, label: "Security" },

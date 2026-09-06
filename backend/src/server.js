@@ -2,6 +2,7 @@ import { config } from "./config.js";
 import app from "./app.js";
 import { seedIfEmpty } from "./lib/seed.js";
 import { ensureEnabled, pull, push, ensureSchema } from "./lib/remoteStore.js";
+import { migrateLegacyApplications } from "./lib/applications.js";
 import { db } from "./lib/db.js";
 
 async function syncFromRemote() {
@@ -9,7 +10,11 @@ async function syncFromRemote() {
   try {
     const remote = await pull();
     if (remote) {
-      db.data = { users: remote.users, members: remote.members, parcels: remote.parcels, resetTokens: [] };
+      db.data = {
+        users: remote.users || [], members: remote.members || [], parcels: remote.parcels || [],
+        resetTokens: remote.resetTokens || [], applications: remote.applications || [],
+        messages: remote.messages || [], announcements: remote.announcements || [],
+      };
       console.log("[remote] loaded " + remote.users.length + " users, " + remote.members.length + " members, " + remote.parcels.length + " parcels from Neon");
     } else if (!db.isEmpty()) {
       await ensureSchema();
@@ -28,6 +33,9 @@ async function main() {
   } catch (err) {
     console.error("[seed] Demo seeding failed:", err);
   }
+
+  // After the remote pull: fold any legacy-file applications into the synced store.
+  migrateLegacyApplications();
 
   const server = app.listen(config.port, config.host, () => {
     console.log("");

@@ -10,6 +10,8 @@ import {
   ShieldCheck,
   UserRound,
   ClipboardCheck,
+  Inbox,
+  Megaphone,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
@@ -25,7 +27,9 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { useDispatch } from "react-redux";
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { axiosInstance } from "@/services/axiosInstance";
 import { logout } from "@/features/auth/authSlice";
 const mainItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -36,6 +40,8 @@ const mainItems = [
   { title: "Parcel Tracking", url: "/tracking", icon: Search },
   { title: "Add Admin", url: "/add-admin", icon: UserPlus },
   { title: "Membership Requests", url: "/membership-applications", icon: ClipboardCheck },
+  { title: "Messages", url: "/messages", icon: Inbox },
+  { title: "Announcements", url: "/announcements", icon: Megaphone },
   { title: "Profile", url: "/profile", icon: UserRound },
   { title: "Security", url: "/security", icon: ShieldCheck },
 ];
@@ -44,6 +50,24 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const token = useSelector((store) => store.auth.token);
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    if (!token) return;
+    let active = true;
+    const tick = () =>
+      axiosInstance
+        .get("/messages/admin/unread-count")
+        .then(({ data }) => active && setUnread(data.unread || 0))
+        .catch(() => {});
+    tick();
+    const id = setInterval(tick, 30000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, [token]);
   const handleLogout = () => {
     dispatch(logout());
     navigate("/login");
@@ -83,6 +107,11 @@ export function AppSidebar() {
                       >
                         <item.icon className="h-4 w-4" />{" "}
                         {!collapsed && <span>{item.title}</span>}
+                        {item.title === "Messages" && unread > 0 && (
+                          <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">
+                            {unread}
+                          </span>
+                        )}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
