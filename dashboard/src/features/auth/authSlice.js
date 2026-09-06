@@ -8,6 +8,7 @@ const getErrorMessage = (error) =>
 const LOGIN_PATH = import.meta.env.VITE_AUTH_LOGIN_PATH || "/auth/login";
 const ADD_USER_PATH = import.meta.env.VITE_AUTH_ADD_USER_PATH || "/auth/add-user";
 const ADMIN_OTP_VERIFY_PATH = import.meta.env.VITE_AUTH_OTP_VERIFY_PATH || "/auth/admin/otp/verify";
+const ADMIN_DEV_LOGIN_PATH = "/auth/admin/dev-login";
 
 export const loginThunk = createAsyncThunk(
   "auth/login",
@@ -34,6 +35,23 @@ export const adminOtpVerifyThunk = createAsyncThunk(
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user || null));
       toast.success("Logged In");
+      return data;
+    } catch (error) {
+      const message = getErrorMessage(error);
+      toast.error(message);
+      return thunkAPI.rejectWithValue(message);
+    }
+  },
+);
+
+export const adminDevLoginThunk = createAsyncThunk(
+  "auth/devLogin",
+  async ({ email, password }, thunkAPI) => {
+    try {
+      const { data } = await axiosInstance.post(ADMIN_DEV_LOGIN_PATH, { email, password });
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user || null));
+      toast.success("Logged In (developer)");
       return data;
     } catch (error) {
       const message = getErrorMessage(error);
@@ -112,6 +130,19 @@ const authSlice = createSlice({
       .addCase(adminOtpVerifyThunk.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || "Sign-in failed";
+      })
+      .addCase(adminDevLoginThunk.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(adminDevLoginThunk.fulfilled, (state, action) => {
+        state.loading = false;
+        state.token = action.payload?.token || null;
+        state.user = action.payload?.user || null;
+      })
+      .addCase(adminDevLoginThunk.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "Developer login failed";
       });
   },
 });

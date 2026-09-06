@@ -214,6 +214,7 @@ export async function sendOtpEmail({ to, code }) {
   const smtpPass = process.env.EMAIL_HOST_PASSWORD;
   if (smtpHost && smtpUser && smtpPass) {
     await smtpSend({ host: smtpHost, port: process.env.EMAIL_PORT, user: smtpUser, password: smtpPass, from: sender, to, subject, html });
+    console.log(`[mail] queued "${subject}" to ${to} via ${smtpHost}:${process.env.EMAIL_PORT || 465}`);
     return true;
   }
   const sent = await sendViaBrevo({ to, subject, html });

@@ -13,7 +13,35 @@ const app = express();
 const LANDING = fs.readFileSync(new URL("./landing.html", import.meta.url), "utf8");
 
 app.disable("x-powered-by");
-app.use(cors());
+
+// Explicit CORS: local dev apps, the Vercel frontends, plus any extra origins
+// configured through CORS_ORIGINS (comma separated). Credentials are allowed
+// only for these origins — never a wildcard with credentials.
+const EXTRA_ORIGINS = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+const ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
+  "https://swiftkifisha.vercel.app",
+  "https://swiftkifisha-dashboard.vercel.app",
+  ...EXTRA_ORIGINS,
+];
+app.use(
+  cors({
+    origin(origin, cb) {
+      // Allow non-browser clients (curl, server-to-server) without an Origin.
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+      return cb(null, false);
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
 app.use(express.json({ limit: "1mb" }));
 
 // Tiny request log for development.

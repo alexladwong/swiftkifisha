@@ -10,6 +10,7 @@ import { HUB_COUNTRIES, HUB_MAILBOX_EXAMPLES } from "../lib/intl.js";
 import { sendPasswordResetEmail, sendOtpEmail } from "../lib/mailer.js";
 import {
   googleConfig, googleStateToken, readGoogleState, googleAuthURL, exchangeGoogleCode,
+  googleRedirectURI,
 } from "../lib/google.js";
 
 const router = Router();
@@ -132,6 +133,47 @@ router.post("/signup", ah(async (req, res) => {
     user: { _id: user._id, name: user.name, email: user.email, role: "member", createdAt: user.createdAt,
       memberCode, plan: member.plan, homeCountry: member.homeCountry, homeCity: member.homeCity, hubAddresses },
   });
+}));
+
+/**
+ * POST /api/auth/admin/dev-login { email, password }
+ * DEVELOPMENT-ONLY fallback for the local admin when email OTP is unavailable.
+ * - Returns 404 in production (route does not exist there, effectively).
+ * - Validates DEV_ADMIN_EMAIL / DEV_ADMIN_PASSWORD from the environment.
+ * - Issues the exact same admin JWT/user contract as OTP verification.
+ */
+router.post("/admin/dev-login", ah(async (req, res) => {
+  if (process.env.NODE_ENV === "production") {
+    return res.status(404).end();
+  }
+  const devEmail = (process.env.DEV_ADMIN_EMAIL || "").toLowerCase().trim();
+  const devPassword = process.env.DEV_ADMIN_PASSWORD || "";
+  if (!devEmail || !devPassword) {
+    return res.status(503).json({ message: "Developer login is not configured (DEV_ADMIN_EMAIL / DEV_ADMIN_PASSWORD)." });
+  }
+  const { email, password } = req.body || {};
+  const givenEmail = String(email || "").toLowerCase().trim();
+  const givenPassword = String(password || "");
+  if (givenEmail !== devEmail || givenPassword.length !== devPassword.length) {
+    return res.status(401).json({ message: "Invalid developer credentials." });
+  }
+  let equal = true;
+  for (let i = 0; i < devPassword.length; i += 1) {
+    if (givenPassword.charCodeAt(i) !== devPassword.charCodeAt(i)) equal = false;
+  }
+  if (!equal) {
+    return res.status(401).json({ message: "Invalid developer credentials." });
+  }
+  const admin = db.data.users.find((u) => u.email === devEmail && u.role === "admin");
+  if (!admin) {
+    return res.status(401).json({ message: "Invalid developer credentials." });
+  }
+  const token = jwt.sign(
+    { sub: admin._id, role: admin.role, name: admin.name, email: admin.email },
+    config.jwtSecret,
+    { expiresIn: config.jwtExpiresIn },
+  );
+  return res.json({ message: "Logged in successfully", token, user: publicUser(admin) });
 }));
 
 /* --------------------- Admin email-OTP sign-in (no password) --------------------- */
@@ -260,7 +302,7 @@ const SK_SESSION_COOKIE = "sk_session";
 function setSessionCookie(res, token) {
   res.cookie(SK_SESSION_COOKIE, token, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: config.isDev ? "lax" : "none",
     secure: !config.isDev,
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: "/",
@@ -282,14 +324,10 @@ router.get("/sign-in/social", ah(async (req, res) => {
   if (!g.enabled) {
     return res.status(503).json({ message: "Google sign-in is not configured on this backend." });
   }
-  let origin;
-  try {
-    origin = new URL(callbackURL).origin;
-    if (origin === "null") throw new Error("bad");
-  } catch {
+  if (!/^https?:\/\//.test(callbackURL)) {
     return res.status(400).json({ message: "A valid callback URL is required." });
   }
-  const redirectURI = origin + "/api/auth/callback/google";
+  const redirectURI = googleRedirectURI();
   const state = googleStateToken(callbackURL);
   return res.redirect(googleAuthURL({ clientId: g.clientId, redirectURI, state }));
 }));
@@ -310,15 +348,11 @@ router.get("/callback/google", ah(async (req, res) => {
   if (!code) return fail("Google did not return an authorization code.");
 
   const callbackURL = readGoogleState(String(req.query.state || ""));
-  let origin;
-  try {
-    origin = new URL(callbackURL || "/").origin;
-    if (origin === "null") throw new Error("bad");
-  } catch {
+  if (!callbackURL) {
     return res.status(400).json({ message: "Invalid sign-in state. Please try again." });
   }
   const g = googleConfig();
-  const redirectURI = origin + "/api/auth/callback/google";
+  const redirectURI = googleRedirectURI();
 
   let profile;
   try {

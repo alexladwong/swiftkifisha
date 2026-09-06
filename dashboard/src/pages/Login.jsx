@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { adminOtpVerifyThunk } from "@/features/auth/authSlice";
+import { adminOtpVerifyThunk, adminDevLoginThunk } from "@/features/auth/authSlice";
 import { axiosInstance } from "@/services/axiosInstance";
 
 const OTP_REQUEST_PATH = import.meta.env.VITE_AUTH_OTP_REQUEST_PATH || "/auth/admin/otp/request";
@@ -27,6 +27,15 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null); // { message?, devOtp?, error? }
   const codeRef = useRef(null);
+  // DEV-ONLY admin fallback (rendered only when import.meta.env.DEV).
+  const [devForm, setDevForm] = useState({ email: "", password: "" });
+  const [devError, setDevError] = useState(null);
+
+  const devLogin = async (e) => {
+    e.preventDefault();
+    setDevError(null);
+    await dispatch(adminDevLoginThunk({ email: devForm.email, password: devForm.password }));
+  };
 
   useEffect(() => {
     if (token) {
@@ -158,6 +167,60 @@ export default function LoginPage() {
               )}
             </CardContent>
           </Card>
+
+          {import.meta.env.DEV && (
+            <Card className="mt-6 border border-dashed shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Developer login</CardTitle>
+                <CardDescription>
+                  Local-only fallback while email OTP is unavailable. Never present in production
+                  builds; the backend also rejects it when NODE_ENV=production.
+                </CardDescription>
+                <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+                  Credentials live in <code className="font-mono">backend/.env</code> as{" "}
+                  <code className="font-mono">DEV_ADMIN_EMAIL</code> /{" "}
+                  <code className="font-mono">DEV_ADMIN_PASSWORD</code> — the backend prints both in
+                  the dev console on startup.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={devLogin} className="space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="dev-email">Email</Label>
+                      <Input
+                        id="dev-email"
+                        type="email"
+                        autoComplete="off"
+                        value={devForm.email}
+                        onChange={(ev) => setDevForm({ ...devForm, email: ev.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="dev-password">Password</Label>
+                      <Input
+                        id="dev-password"
+                        type="password"
+                        autoComplete="off"
+                        value={devForm.password}
+                        onChange={(ev) => setDevForm({ ...devForm, password: ev.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+                  {devError && (
+                    <p className="rounded-lg bg-destructive/10 px-3 py-2 text-[13px] font-medium text-destructive" role="alert">
+                      {devError}
+                    </p>
+                  )}
+                  <Button type="submit" disabled={loading} className="bg-primary hover:bg-primary/90">
+                    {loading ? "Signing in..." : "Local Admin Sign In"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          )}
         </motion.div>
       </div>
     </>

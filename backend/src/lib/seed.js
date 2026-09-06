@@ -320,10 +320,16 @@ export async function buildDemoData() {
 
 /**
  * Seeds the demo dataset once when the database is empty (first boot).
+ * Demo data is DEV-ONLY: production only seeds when SEED_DEMO_DATA=true is
+ * explicitly set (e.g. a staging box) — never with hard-coded demo admins.
  * Returns true when seeding happened.
  */
 export async function seedIfEmpty() {
   if (!config.seedOnStart || !db.isEmpty()) return false;
+  if (!config.isDev && process.env.SEED_DEMO_DATA !== "true") {
+    console.log("[seed] skipped in production (set SEED_DEMO_DATA=true to seed demo data).");
+    return false;
+  }
   const { users, members, parcels } = await buildDemoData();
   db.data = { users, members, parcels };
   db.persist();

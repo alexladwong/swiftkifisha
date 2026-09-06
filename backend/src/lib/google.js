@@ -25,6 +25,17 @@ export function googleConfig() {
   return { clientId, clientSecret, enabled: Boolean(clientId && clientSecret) };
 }
 
+/**
+ * The backend OWNS the OAuth callback: the redirect URI is always
+ * PUBLIC_API_URL + /api/auth/callback/google — never derived from the
+ * browser's window.location. Local default http://localhost:5001; set
+ * PUBLIC_API_URL=https://api.eazyjobs.info on the production host.
+ */
+export function googleRedirectURI() {
+  const base = (process.env.PUBLIC_API_URL || "http://localhost:5001").replace(/\/+$/, "");
+  return base + "/api/auth/callback/google";
+}
+
 /** Stateless signed state carrying the frontend callback URL (10 min). */
 export function googleStateToken(callbackURL) {
   return jwt.sign({ cb: callbackURL }, config.jwtSecret, { expiresIn: "10m" });

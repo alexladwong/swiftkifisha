@@ -35,10 +35,19 @@ async function main() {
     console.log(`    http://localhost:${config.port}/api/health`);
     console.log("");
     console.log("  Frontends proxy /api here (see frontend & dashboard vite.config.js).");
-    console.log("  Demo admin logins (seeded on first start):");
+    if (config.isDev) {
+    console.log("  Development demo admins (seeded on first start):");
     console.log("    admin@swiftship.com / Admin@123");
     console.log("    ops@swiftship.com   / Ops@123");
     console.log("  Reset demo data anytime with:  npm run seed");
+    if (process.env.DEV_ADMIN_EMAIL && process.env.DEV_ADMIN_PASSWORD) {
+      console.log("");
+      console.log("  DEV-ONLY admin fallback (email OTP unavailable):");
+      console.log(`    email:    ${process.env.DEV_ADMIN_EMAIL}`);
+      console.log(`    password: ${process.env.DEV_ADMIN_PASSWORD}`);
+      console.log("    (route POST /api/auth/admin/dev-login — disabled in production)");
+    }
+  }
     console.log("");
   });
 
