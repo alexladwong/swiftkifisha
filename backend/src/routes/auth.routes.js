@@ -523,7 +523,13 @@ router.get("/callback/google", ah(async (req, res) => {
     { expiresIn: config.jwtExpiresIn },
   );
   setSessionCookie(res, token);
-  return res.redirect(callbackURL || "/");
+  // Same-origin cookie mode keeps working (dev proxy / same-domain setups),
+  // but cross-site browsers increasingly block third-party cookies, so the
+  // token also rides in the URL FRAGMENT (#token=…): fragments are never sent
+  // to any server and do not appear in Referer headers. The /auth/callback
+  // page stores it and continues exactly like a cookie session.
+  const sep = callbackURL.includes("#") ? "&" : "#";
+  return res.redirect((callbackURL || "/") + `${sep}token=${encodeURIComponent(token)}`);
 }));
 
 /**

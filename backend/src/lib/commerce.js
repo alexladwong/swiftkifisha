@@ -178,6 +178,17 @@ export function seedCommerceDefaults() {
       changed = true;
     }
   }
+  // Explicit FX rules — the ONLY mechanism that converts between currencies
+  // server-side. No silent conversion anywhere else.
+  const fxRules = [
+    { code: "fx.ugxPerUsd", value: 3700, unit: "UGX/USD", note: "Explicit backend rate: USD amounts settle as UGX × rate (mirrors intl.js seed)" },
+  ];
+  for (const rule of fxRules) {
+    if (!db.data.pricingRules.some((r) => r.code === rule.code)) {
+      db.data.pricingRules.push({ _id: crypto.randomUUID(), ...rule });
+      changed = true;
+    }
+  }
   if (changed) db.persist();
 }
 

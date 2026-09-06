@@ -6,6 +6,7 @@ import { Package, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { fetchSocialSession } from "@/lib/authApi";
+import { fetchMe } from "@/lib/portalApi";
 import { setSession } from "@/features/auth/authSlice";
 import { useI18n } from "@/i18n";
 
@@ -31,12 +32,42 @@ export default function SocialCallbackPage() {
         return;
       }
       try {
-        const data = await fetchSocialSession();
+        // 1) Cookie session (same-origin/proxy setups).
+        try {
+          const data = await fetchSocialSession();
+          if (!active) return;
+          if (data?.token && data?.user) {
+            localStorage.setItem("token", data.token);
+            localStorage.setItem("user", JSON.stringify(data.user));
+            dispatch(setSession({ token: data.token, user: data.user }));
+            navigate("/account", { replace: true });
+            return;
+          }
+        } catch { /* fall through to fragment token */ }
+
+        // 2) Fragment token (#token=…): handed over by the backend when the
+        // callback ran on a different origin than this page (cross-site
+        // cookies may be blocked). Fragments are never sent to servers.
+        const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        const fragmentToken = hash.get("token");
+        if (!fragmentToken) throw new Error("no session and no token");
+        const me = await fetchMe().catch(() => null);
         if (!active) return;
-        if (!data?.token || !data?.user) throw new Error("empty session");
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
-        dispatch(setSession({ token: data.token, user: data.user }));
+        const base = me?.member || {};
+        const user = {
+          _id: base._id || undefined,
+          name: base.name || "",
+          email: base.email || "",
+          role: "member",
+          memberCode: base.memberCode,
+          plan: base.plan,
+          homeCountry: base.homeCountry,
+          homeCity: base.homeCity,
+          hubAddresses: base.hubAddresses || [],
+        };
+        localStorage.setItem("token", fragmentToken);
+        localStorage.setItem("user", JSON.stringify(user));
+        dispatch(setSession({ token: fragmentToken, user }));
         navigate("/account", { replace: true });
       } catch {
         if (active) setError(t("auth.socialErrorDesc"));

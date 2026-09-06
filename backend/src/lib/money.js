@@ -15,6 +15,7 @@
 import crypto from "node:crypto";
 import { db } from "./db.js";
 import { describeProvider } from "./paymentProviders.js";
+import { ruleValue } from "./commerce.js";
 import { addAudit } from "./commerce.js";
 
 /* ------------------------------- statuses ------------------------------- */
@@ -429,3 +430,32 @@ export function buildInvoiceLines({ packages, insurance, declaredValue, serviceT
 
 /** Money rounding helper. */
 export const money = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+/* ------------------------------- explicit FX ------------------------------- */
+
+/**
+ * The ONLY server-side currency conversion. Rates come from pricing rules
+ * (never from the frontend):
+ *   UGX→USD: divide by fx.ugxPerUsd   USD→UGX: multiply by fx.ugxPerUsd
+ *   UGX→KES: divide by mpesa.rateUgx (UGX per KES)
+ *   USD→KES: divide by mpesa.rateUsd (USD per KES)
+ *   KES→USD: divide by mpesa.rateUsd? — treated as mpesa.rateUsd (USD per KES)
+ * Returns { converted, rate } rounded, or { error } when no rule exists.
+ */
+export function fxConvert(amount, from, to) {
+  const amt = Number(amount) || 0;
+  if (from === to) return { converted: money(amt), rate: 1, ruleCode: null };
+  const rule = (code) => Number(ruleValue(code, 0));
+  const r8 = (n) => Math.round(n * 1e8) / 1e8;
+  let base = null; // how many `to` units per 1 `from` unit
+  if (from === "UGX" && to === "USD") base = rule("fx.ugxPerUsd") > 0 ? 1 / rule("fx.ugxPerUsd") : null;
+  if (from === "USD" && to === "UGX") base = rule("fx.ugxPerUsd") > 0 ? rule("fx.ugxPerUsd") : null;
+  if (from === "UGX" && to === "KES") base = rule("mpesa.rateUgx") > 0 ? 1 / rule("mpesa.rateUgx") : null;
+  if (from === "KES" && to === "UGX") base = rule("mpesa.rateUgx") > 0 ? rule("mpesa.rateUgx") : null;
+  if (from === "USD" && to === "KES") base = rule("mpesa.rateUsd") > 0 ? 1 / rule("mpesa.rateUsd") : null;
+  if (from === "KES" && to === "USD") base = rule("mpesa.rateUsd") > 0 ? rule("mpesa.rateUsd") : null;
+  if (base === null) {
+    return { error: `No backend FX rule converts ${from} to ${to} — configure it (fx.ugxPerUsd / mpesa.rateUgx / mpesa.rateUsd) before mixing currencies.` };
+  }
+  return { converted: money(amt * base), rate: r8(base), ruleCode: from + "->" + to };
+}

@@ -19,6 +19,7 @@ import {
   ledgerBalance, ledgerBalances, addLedger, buildInvoiceLines, money,
   memberWalletCurrency, walletMinTopup, RATE_USD_UGX, momoTopupConfig,
   publicUssd, privateUssd, ussdTelUri, maskedNumber, validPublicUssdTemplate, MOMO_DIAL_DEFAULT,
+  fxConvert,
 } from "../lib/money.js";
 import multer from "multer";
 import path from "node:path";
@@ -72,6 +73,14 @@ const validDestination = (d) => {
 function publicMomoSummary() {
   const momo = momoTopupConfig();
   return { method: "MOBILE_MONEY_MANUAL", network: momo.networkLabel, enabled: momo.enabled !== false };
+}
+
+/** Effective charge amount/currency for a payment (settlement when present). */
+function settlementOf(p) {
+  if (p?.settlementAmount != null && p?.settlementCurrency) {
+    return { amount: p.settlementAmount, currency: p.settlementCurrency };
+  }
+  return { amount: p?.amount, currency: p?.currency || "USD" };
 }
 
 function emailMember(to, subject, html) {
@@ -256,6 +265,21 @@ router.post("/checkout", requireAuth, ah(async (req, res) => {
   const wantChannel = String(b.channel || "OFFLINE");
   const ready = channelReady(wantChannel, "invoice");
   if (!ready.ok) return res.status(409).json({ message: ready.message });
+  let settlementFields = {};
+  if (wantChannel === "MOBILE_MONEY" && invoice.currency !== "UGX") {
+    const conv = fxConvert(invoice.total, invoice.currency || "USD", "UGX");
+    if (conv.error) {
+      return res.status(409).json({ message: `${conv.error} Mobile money settles in UGX.` });
+    }
+    settlementFields = {
+      settlementAmount: conv.converted,
+      settlementCurrency: "UGX",
+      rate: conv.rate,
+      ruleCode: conv.ruleCode,
+      sourceAmount: invoice.total,
+      sourceCurrency: invoice.currency || "USD",
+    };
+  }
   const payment = {
     _id: crypto.randomUUID(),
     paymentId: paymentId(),
@@ -268,6 +292,7 @@ router.post("/checkout", requireAuth, ah(async (req, res) => {
     status: PAYMENT_STATUS.PENDING,
     createdAt: new Date().toISOString(),
     note: "Awaiting payment",
+    ...settlementFields,
   };
   db.data.payments = db.data.payments || [];
   db.data.payments.push(payment);
@@ -434,10 +459,15 @@ router.post("/wallet/pay-invoice", requireAuth, ah(async (req, res) => {
   if (!invoice) return res.status(404).json({ message: "Invoice not found." });
   if (invoice.status === "VOID") return res.status(409).json({ message: "Invoice is voided." });
   if (invoice.balance <= 0) return res.status(409).json({ message: "Invoice already settled." });
+  const member = memberRow(user);
   const invCur = invoice.currency || "USD";
-  const balance = round(ledgerBalance(user.email, invCur));
-  if (balance < invoice.balance) {
-    return res.status(409).json({ message: `Wallet balance ${balance} ${invCur} is below the invoice balance ${invoice.balance} ${invCur}.` });
+  const sourceCur = memberWalletCurrency(member); // how this member funds their wallet
+  const fx = sourceCur === invCur ? { converted: invoice.balance, rate: 1 } : fxConvert(invoice.balance, invCur, sourceCur);
+  if (fx.error) return res.status(409).json({ message: fx.error });
+  const needed = fx.converted;
+  const balance = round(ledgerBalance(user.email, sourceCur));
+  if (balance < needed) {
+    return res.status(409).json({ message: `Wallet balance ${balance} ${sourceCur} is below the ${needed} ${sourceCur} needed for this ${invoice.balance} ${invCur} invoice.` });
   }
   const existing = (db.data.payments || []).some((p) => p.invoiceId === invoice._id && p.status === "PAID");
   const payment = {
@@ -447,20 +477,23 @@ router.post("/wallet/pay-invoice", requireAuth, ah(async (req, res) => {
     invoiceId: invoice._id,
     type: "INVOICE",
     amount: invoice.balance,
-    currency: "USD",
+    currency: invCur,
     channel: "WALLET",
     status: PAYMENT_STATUS.PAID,
     reference: "wallet-ledger-debit",
     createdAt: new Date().toISOString(),
     paidAt: new Date().toISOString(),
     verifiedBy: "system:wallet",
-    note: "Paid from account credit",
+    note: sourceCur === invCur ? "Paid from account credit" : `Paid from ${sourceCur} wallet credit at ${fx.rate} ${invCur}/${sourceCur}`,
+    ...(sourceCur !== invCur
+      ? { sourceAmount: fx.converted, sourceCurrency: sourceCur, rate: fx.rate, ruleCode: fx.ruleCode, settlementAmount: invoice.balance, settlementCurrency: invCur }
+      : {}),
   };
   db.data.payments = db.data.payments || [];
   db.data.payments.push(payment);
   const entry = addLedger({
-    email: user.email, type: "DEBIT", amount: invoice.balance, currency: invoice.currency || "USD",
-    reason: `Payment ${payment.paymentId} on invoice ${invoice.invoiceId}`, refType: "payment", refId: payment._id, actor: "system:wallet",
+    email: user.email, type: "DEBIT", amount: fx.converted, currency: sourceCur,
+    reason: `Payment ${payment.paymentId} on invoice ${invoice.invoiceId}${sourceCur !== invCur ? ` (${fx.converted} ${sourceCur} @ ${fx.rate})` : ""}`, refType: "payment", refId: payment._id, actor: "system:wallet",
   });
   db.persist();
   const { invoice: inv, shipment } = applyPaymentToInvoice(payment);
@@ -515,12 +548,13 @@ router.get("/payments/:id", requireAuth, ah(async (req, res) => {
   if (payment.channel === "MOBILE_MONEY" && ["PENDING", "PAYMENT_SUBMITTED"].includes(payment.status)) {
     const momo = momoTopupConfig();
     const invoice = payment.invoiceId ? (db.data.invoices || []).find((i) => i._id === payment.invoiceId) : null;
+    const charge = settlementOf(payment);
     out.mobileMoney = {
       method: "MOBILE_MONEY_MANUAL",
       network: momo.networkLabel,
-      amount: payment.amount,
-      currency: payment.currency || "USD",
-      ussd: publicUssd(payment.amount, momo.ussdTemplate),
+      amount: charge.amount,
+      currency: charge.currency,
+      ussd: publicUssd(charge.amount, momo.ussdTemplate),
       qrUrl: `/api/payments/${payment._id}/mobile-money-qr`,
       dialUrl: `/api/payments/${payment._id}/mobile-money-dial`,
       invoiceReference: invoice?.invoiceId || payment.paymentId,
@@ -542,7 +576,8 @@ router.get("/payments/:id/mobile-money-qr", requireAuth, ah(async (req, res) => 
     return res.status(404).json({ message: "Payment not found." });
   }
   const momo = momoTopupConfig();
-  const dial = privateUssd(payment.amount, momo.dialTemplate || MOMO_DIAL_DEFAULT, momo.number);
+  const charge = settlementOf(payment);
+  const dial = privateUssd(charge.amount, momo.dialTemplate || MOMO_DIAL_DEFAULT, momo.number);
   try {
     const png = await QRCode.toBuffer(ussdTelUri(dial), { type: "png", width: 520, margin: 1, errorCorrectionLevel: "M" });
     res.setHeader("Content-Type", "image/png");
@@ -566,7 +601,8 @@ router.get("/payments/:id/mobile-money-dial", requireAuth, ah(async (req, res) =
     return res.status(404).json({ message: "Payment not found." });
   }
   const momo = momoTopupConfig();
-  const dial = privateUssd(payment.amount, momo.dialTemplate || MOMO_DIAL_DEFAULT, momo.number);
+  const charge = settlementOf(payment);
+  const dial = privateUssd(charge.amount, momo.dialTemplate || MOMO_DIAL_DEFAULT, momo.number);
   res.setHeader("Cache-Control", "no-store");
   return res.json({ telUri: ussdTelUri(dial) });
 }));
