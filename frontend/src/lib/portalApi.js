@@ -20,6 +20,11 @@ export const updateMe = async (payload) => {
   return data;
 };
 
+export const fetchMembershipStatus = async () => {
+  const { data } = await axiosInstance.get("/auth/membership/status", { headers: auth() });
+  return data; // { status, note? }
+};
+
 export const changePassword = async (payload) => {
   const { data } = await axiosInstance.post(
     import.meta.env.VITE_AUTH_CHANGE_PASSWORD_PATH || "/auth/change-password",

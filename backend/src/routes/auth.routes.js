@@ -7,7 +7,8 @@ import { db, objectId } from "../lib/db.js";
 import { ah, requireAuth } from "../middleware/auth.js";
 import { isEmail } from "../lib/util.js";
 import { HUB_COUNTRIES, HUB_MAILBOX_EXAMPLES } from "../lib/intl.js";
-import { sendPasswordResetEmail, sendOtpEmail } from "../lib/mailer.js";
+import { sendPasswordResetEmail, sendOtpEmail, sendMembershipEmail } from "../lib/mailer.js";
+import { createApplication, applicationByEmail } from "../lib/applications.js";
 import {
   googleConfig, googleStateToken, readGoogleState, googleAuthURL, exchangeGoogleCode,
   googleRedirectURI,
@@ -145,32 +146,19 @@ router.post("/signup", ah(async (req, res) => {
   };
   db.data.users.push(user);
 
-  // Member profile: Saver plan, Uganda home, US + UK mailboxes with unique suite.
-  const memberCode = "SP-" + String(10000 + db.data.members.length + Math.floor(Math.random() * 80000));
-  const hubAddresses = ["United States", "United Kingdom"].map((country) => {
-    const hub = HUB_COUNTRIES.find((h) => h.country === country);
-    return {
-      country,
-      city: hub ? hub.city : country,
-      suite: memberCode + "-" + (hub ? hub.code : "XX"),
-      addressLines: HUB_MAILBOX_EXAMPLES[country] ?? [],
-    };
-  });
-  const member = {
-    _id: objectId(),
-    name: user.name,
-    email: normalized,
-    phone: "+256-700-000000",
-    plan: "Saver",
-    homeCountry: "Uganda",
-    homeCity: "Kampala",
-    address: "Kampala, Uganda",
-    memberCode,
-    joinedAt: new Date().toISOString(),
-    hubAddresses,
-  };
-  db.data.members.push(member);
+  // Membership application: the member profile + mailboxes are provisioned
+  // only after an admin accepts the application (free during launch).
+  if (!applicationByEmail(normalized)) {
+    createApplication({ name: user.name, email: normalized, phone: "+256-700-000000", homeCountry: "Uganda" });
+  }
   db.persist();
+  for (const admin of db.data.users.filter((u) => u.role === "admin")) {
+    sendMembershipEmail({
+      to: admin.email, kind: "new",
+      applicant: { name: user.name, email: normalized, phone: "+256-700-000000", homeCountry: "Uganda" },
+      reviewUrl: `${process.env.ADMIN_DASH_URL || "http://localhost:5174"}/membership-applications`,
+    }).catch((e) => console.error(`[mail] admin notification to ${admin.email} failed:`, e?.message ?? e));
+  }
 
   const token = jwt.sign(
     { sub: user._id, role: user.role, name: user.name, email: user.email },
@@ -178,10 +166,10 @@ router.post("/signup", ah(async (req, res) => {
     { expiresIn: config.jwtExpiresIn },
   );
   return res.status(201).json({
-    message: "Account created successfully",
+    message: "Account created — your membership is pending quick approval (free during launch).",
     token,
-    user: { _id: user._id, name: user.name, email: user.email, role: "member", createdAt: user.createdAt,
-      memberCode, plan: member.plan, homeCountry: member.homeCountry, homeCity: member.homeCity, hubAddresses },
+    membership: { status: "pending" },
+    user: { _id: user._id, name: user.name, email: user.email, role: "member", createdAt: user.createdAt },
   });
 }));
 

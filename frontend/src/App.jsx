@@ -15,6 +15,7 @@ import TrackParcel from "./pages/TrackParcel";
 import CalculateCost from "./pages/CalculateCost";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
+import BecomeMember from "./pages/BecomeMember";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import SocialCallback from "./pages/SocialCallback";
@@ -46,6 +47,7 @@ const App = () => (
         <Route path="/calculate" element={<CalculateCost />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/become-member" element={<BecomeMember />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/auth/callback" element={<SocialCallback />} />

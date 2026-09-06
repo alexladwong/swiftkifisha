@@ -3,11 +3,12 @@ import { Link, NavLink, Outlet, useNavigate, useLocation } from "react-router-do
 import { useDispatch, useSelector } from "react-redux";
 import {
   LayoutDashboard, UserRound, MapPin, ShieldCheck, Package, LogOut, Menu,
-  HelpCircle, ArrowUpRight,
+  HelpCircle, ArrowUpRight, Clock3, Loader2,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import SideDrawer from "@/components/layout/SideDrawer";
 import AuthDialog from "@/components/AuthDialog";
+import { fetchMembershipStatus } from "@/lib/portalApi";
 import { logout } from "@/features/auth/authSlice";
 
 const NAV = [
@@ -81,6 +82,8 @@ export default function PortalShell() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState("signin");
+  const [membership, setMembership] = useState(null); // { status, note? }
+  const [checkingMembership, setCheckingMembership] = useState(false);
 
   useEffect(() => {
     setDrawerOpen(false);
@@ -125,6 +128,63 @@ export default function PortalShell() {
           </Link>
         </div>
         <AuthDialog open={authOpen} onOpenChange={setAuthOpen} initialMode={authMode} />
+      </div>
+    );
+  }
+
+  // Membership gate: pending/reviewed/cancelled applicants see their status
+  // instead of the member content; accepted members (or admins) proceed.
+  useEffect(() => {
+    let active = true;
+    setCheckingMembership(true);
+    fetchMembershipStatus()
+      .then((data) => active && setMembership(data))
+      .catch(() => active && setMembership({ status: "accepted" })) // fallback: treat as member
+      .finally(() => active && setCheckingMembership(false));
+    return () => {
+      active = false;
+    };
+  }, [token]);
+
+  const membershipCopy = {
+    pending: {
+      title: "Your membership is pending approval",
+      body: "Our team reviews every application — usually within a day. We'll email you the moment it's approved (membership is free during launch).",
+    },
+    under_review: {
+      title: "Your application is under review",
+      body: "We're taking a closer look at your application. We'll email you as soon as there's an update.",
+    },
+    cancelled: {
+      title: "Your membership request was not approved",
+      body: "We're sorry — this application was cancelled. Reach out to our team if you believe this was a mistake.",
+    },
+  };
+  const mstate = membershipCopy[membership?.status];
+
+  if (checkingMembership) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center text-muted-foreground">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Checking your membership…
+      </div>
+    );
+  }
+  if (mstate) {
+    return (
+      <div className="flex min-h-[70vh] flex-col items-center justify-center gap-5 px-6 py-16 text-center">
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-soft text-accent">
+          <Clock3 className="h-7 w-7" />
+        </span>
+        <div className="max-w-md">
+          <p className="font-display text-2xl font-bold text-foreground">{mstate.title}</p>
+          <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">{mstate.body}</p>
+          {membership?.note && (
+            <p className="mt-3 rounded-lg bg-surface px-3 py-2 text-sm text-slate-600">Note: {membership.note}</p>
+          )}
+        </div>
+        <Link to="/" className="rounded-lg bg-accent px-5 py-2.5 text-sm font-bold text-white hover:bg-accent/90">
+          Back to SwiftKifisha
+        </Link>
       </div>
     );
   }

@@ -226,6 +226,69 @@ export async function sendOtpEmail({ to, code }) {
  * Sends the password-reset email through the configured provider. Returns
  * true when delivered; false when no provider is configured.
  */
+
+/* ------------------------- membership notifications ------------------------- */
+
+const shell = (title, intro, footer) => `
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto">
+  <h2 style="margin:0 0 4px">SwiftKifisha</h2>
+  <p style="color:#f97316;font-weight:600;margin:0 0 16px">${title}</p>
+  <p style="color:#0f172a;line-height:1.6">${intro}</p>
+  ${footer ? `<p style="color:#0f172a;line-height:1.6">${footer}</p>` : ""}
+  <p style="font-size:12px;color:#94a3b8;line-height:1.6">SwiftKifisha Global — memberships are free during launch; payments are coming soon.</p>
+</div>`;
+
+const STATUS_TEXT = {
+  accepted: "approved 🎉",
+  cancelled: "not approved",
+  under_review: "under review",
+  pending: "received",
+};
+
+/**
+ * Sends membership workflow emails. kind: "new" (to admins) | "status" (to
+ * the applicant). Returns true when queued through a provider.
+ */
+export async function sendMembershipEmail({ to, kind, applicant, status, note, reviewUrl }) {
+  let subject;
+  let html;
+  if (kind === "new") {
+    subject = "New membership application — SwiftKifisha admin";
+    html = shell(
+      "New membership application",
+      `<strong>${applicant.name}</strong> (${applicant.email}${applicant.phone ? ", " + applicant.phone : ""}${applicant.homeCountry ? ", " + applicant.homeCountry : ""}) has applied to become a member.`,
+      `Review it and Accept, Investigate or Cancel: <a href="${reviewUrl}">${reviewUrl}</a>`,
+    );
+  } else {
+    const label = STATUS_TEXT[status] || status;
+    subject = status === "accepted"
+      ? "Welcome to SwiftKifisha — your membership is approved"
+      : "SwiftKifisha membership update";
+    html = shell(
+      `Your membership request is ${label}`,
+      status === "accepted"
+        ? `Hi ${applicant.name}, great news — your SwiftKifisha membership has been <strong>approved</strong>. Your personal US & UK mailbox addresses are ready; sign in to your dashboard to see them. Memberships are free during launch, payments are coming soon.`
+        : status === "cancelled"
+          ? `Hi ${applicant.name}, we're sorry — your membership request was <strong>not approved</strong>.`
+          : `Hi ${applicant.name}, your membership request is <strong>under review</strong>.`,
+      note ? `<em>Note from our team: ${note}</em>` : "",
+    );
+  }
+  const htmlContent = html;
+  const sender = fromParts();
+  const smtpHost = process.env.EMAIL_HOST;
+  const smtpUser = process.env.EMAIL_HOST_USER;
+  const smtpPass = process.env.EMAIL_HOST_PASSWORD;
+  if (smtpHost && smtpUser && smtpPass) {
+    await smtpSend({ host: smtpHost, port: process.env.EMAIL_PORT, user: smtpUser, password: smtpPass, from: sender, to, subject, html: htmlContent });
+    console.log(`[mail] queued "${subject}" to ${to} via ${smtpHost}:${process.env.EMAIL_PORT || 465}`);
+    return true;
+  }
+  const sent = await sendViaBrevo({ to, subject, html: htmlContent });
+  if (!sent) console.log(`[mail] no provider configured — membership email for ${to} (${subject}) not sent`);
+  return sent;
+}
+
 export async function sendPasswordResetEmail({ to, resetLink }) {
   const html = resetHtml(resetLink);
   const subject = "Reset your SwiftKifisha password";

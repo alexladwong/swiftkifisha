@@ -56,7 +56,7 @@ const ShopShip = () => {
                 <Globe2 className="mr-2 h-4 w-4" /> {t("shop.ctaEstimate")}
               </Button>
             </Link>
-            <Link to="/contact">
+            <Link to="/become-member">
               <Button size="lg" variant="outline" className="font-semibold border-accent/30">
                 {t("shop.ctaBecomeMember")}
               </Button>
@@ -179,7 +179,7 @@ const ShopShip = () => {
                         </li>
                       ))}
                     </ul>
-                    <Link to="/contact" className="mt-2">
+                    <Link to="/become-member" className="mt-2">
                       <Button variant={p.id === "Classic" ? "default" : "outline"} className="w-full">
                         {t("shop.choosePlan", { plan: p.id })} <ArrowRight className="ml-1 h-4 w-4" />
                       </Button>
